@@ -57,7 +57,9 @@ $ ./build/bin/tests/<...>
 ```
 
 ## License
-This project is licensed under the [Apache License](LICENSE). For more details, please refer to the License file.
+This project contains portions of code originally from the Microsoft SealPIR project, which is licensed under the MIT License. All modifications and additions made by Alişah Özcan are licensed under the Apache License, Version 2.0.
+
+For more details, please refer to the [LICENSE](LICENSE) file.
 
 ## Contributing
 Contributions are welcome! Please check the [CONTRIBUTING](CONTRIBUTING.md) file for guidelines on how to contribute to the project.
