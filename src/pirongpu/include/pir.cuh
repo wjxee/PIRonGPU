@@ -63,7 +63,39 @@
 #include <omp.h>
 
 namespace pirongpu
-{
+{   
+
+    class CudaException : public std::exception
+    {
+      public:
+        CudaException(const std::string& file, int line, cudaError_t error)
+            : file_(file), line_(line), error_(error)
+        {
+        }
+
+        const char* what() const noexcept override
+        {
+            return m_error_string.c_str();
+        }
+
+      private:
+        std::string file_;
+        int line_;
+        cudaError_t error_;
+        std::string m_error_string = "CUDA Error in " + file_ + " at line " +
+                                     std::to_string(line_) + ": " +
+                                     cudaGetErrorString(error_);
+    };
+
+#define PIRONGPU_CUDA_CHECK(err)                                                \
+    do                                                                         \
+    {                                                                          \
+        cudaError_t error = err;                                               \
+        if (error != cudaSuccess)                                              \
+        {                                                                      \
+            throw CudaException(__FILE__, __LINE__, error);                    \
+        }                                                                      \
+    } while (0)
 
     typedef std::vector<heongpu::Plaintext> Database;
     typedef std::vector<std::vector<heongpu::Ciphertext>> PirQuery;

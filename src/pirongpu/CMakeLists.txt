@@ -20,7 +20,7 @@ file(GLOB_RECURSE LIB_HEADER_FILES
 add_library(pirongpu STATIC ${LIB_SOURCE_FILES})
 
 target_link_libraries(pirongpu PUBLIC 
-    heongpu
+    ${HEONGPU_TARGET}
     OpenMP::OpenMP_CXX
 )
 

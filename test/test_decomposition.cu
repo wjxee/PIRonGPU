@@ -145,7 +145,7 @@ int main(int argc, char* argv[])
             }
         }
     }
-    HEONGPU_CUDA_CHECK(cudaGetLastError());
+    PIRONGPU_CUDA_CHECK(cudaGetLastError());
     /////////////////////////////////////////////////////////////////////////////////
 
     // std::vector<heongpu::Plaintext> encoded = decompose_to_plaintexts(params,

@@ -21,7 +21,10 @@ message(STATUS "Setting CMAKE_CUDA_ARCHITECTURES to ${CMAKE_CUDA_ARCHITECTURES} 
 
 find_package(HEonGPU QUIET)
 
-if(NOT HEonGPU_FOUND)
+if(HEonGPU_FOUND)
+    message(STATUS "HEonGPU found!")
+    set(HEONGPU_TARGET HEonGPU::heongpu)
+else()
     message(STATUS "HEonGPU not found, fetching...")
     include(FetchContent)
     FetchContent_Declare(
@@ -30,8 +33,7 @@ if(NOT HEonGPU_FOUND)
         GIT_TAG        v1.1.0
     )
     FetchContent_MakeAvailable(heongpu)
-else()
-    message(STATUS "HEonGPU found!")
+    set(HEONGPU_TARGET heongpu)
 endif()
 
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O3")

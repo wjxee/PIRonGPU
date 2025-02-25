@@ -367,7 +367,7 @@ namespace pirongpu
                             }
                         }
                     }
-                    HEONGPU_CUDA_CHECK(cudaGetLastError());
+                    PIRONGPU_CUDA_CHECK(cudaGetLastError());
                     /////////////////////////////////////////////////////////////////////////////////
                     for (uint32_t jj = 0; jj < plain_size; jj++)
                     {
