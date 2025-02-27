@@ -87,16 +87,6 @@ namespace pirongpu
                                      cudaGetErrorString(error_);
     };
 
-#define PIRONGPU_CUDA_CHECK(err)                                                \
-    do                                                                         \
-    {                                                                          \
-        cudaError_t error = err;                                               \
-        if (error != cudaSuccess)                                              \
-        {                                                                      \
-            throw CudaException(__FILE__, __LINE__, error);                    \
-        }                                                                      \
-    } while (0)
-
     typedef std::vector<heongpu::Plaintext> Database;
     typedef std::vector<std::vector<heongpu::Ciphertext>> PirQuery;
     typedef std::vector<heongpu::Ciphertext> PirReply;
@@ -160,5 +150,15 @@ namespace pirongpu
                                                   uint64_t pt_bitmask);
 
 } // namespace pirongpu
+
+#define PIRONGPU_CUDA_CHECK(err)                                               \
+    do                                                                         \
+    {                                                                          \
+        cudaError_t error = err;                                               \
+        if (error != cudaSuccess)                                              \
+        {                                                                      \
+            throw pirongpu::CudaException(__FILE__, __LINE__, error);          \
+        }                                                                      \
+    } while (0)
 
 #endif // PIR_H
