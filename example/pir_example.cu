@@ -56,6 +56,7 @@
 #include "pir.cuh"
 #include "pir_client.cuh"
 #include "pir_server.cuh"
+#include "heoncpu.hpp"
 #include <omp.h>
 #include <iostream>
 #include <stdexcept>
@@ -64,6 +65,7 @@ using namespace pirongpu;
 
 int main(int argc, char* argv[])
 {
+    heoncpu::helloworld();
     cudaSetDevice(0); // Use it for memory pool
 
     uint64_t number_of_items = 1 << 16;
