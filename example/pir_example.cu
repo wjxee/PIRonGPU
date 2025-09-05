@@ -54,12 +54,14 @@
  */
 
 #include "pir.cuh"
+#include "pir_cpu.hpp"
 #include "pir_client.cuh"
 #include "pir_server.cuh"
 #include "heoncpu.hpp"
 #include <omp.h>
 #include <iostream>
 #include <stdexcept>
+#include <iterator>
 
 using namespace pirongpu;
 
@@ -85,16 +87,63 @@ int main(int argc, char* argv[])
         std::make_shared<heongpu::Parameters>(
             heongpu::scheme_type::bfv,
             heongpu::keyswitching_type::KEYSWITCHING_METHOD_I);
+    //cpu
+    std::shared_ptr<heoncpu::Parameters> context_cpu =
+        std::make_shared<heoncpu::Parameters>(
+            heoncpu::scheme_type::bfv,
+            heoncpu::keyswitching_type::KEYSWITCHING_METHOD_I);
 
     context->set_poly_modulus_degree(N);
     context->set_coeff_modulus(log_Q_bases_bit_sizes, log_P_bases_bit_sizes);
     context->set_plain_modulus(plain_modulus);
     context->generate();
+    //cpu
+    context_cpu->set_poly_modulus_degree(N);
+    context_cpu->set_coeff_modulus(log_Q_bases_bit_sizes, log_P_bases_bit_sizes);
+    context_cpu->set_plain_modulus(plain_modulus);
+    context_cpu->generate();
+
+    //test consistence
+    {
+    int checkflag=0;
+    int size = context_cpu->intt_table_->size();
+    std::vector<Root64> hv(size);
+    cudaMemcpy(hv.data(), context->intt_table_->data(), size * sizeof(Root64), cudaMemcpyDeviceToHost);
+    for(int i=0;i<context_cpu->intt_table_->size();i++){
+        if(hv[i]!=context_cpu->intt_table_->at(i)){
+            checkflag+=1;
+        }
+        // if(*(context->intt_table_->element_ptr(i))!=context_cpu->intt_table_->at(i)){
+        //     checkflag+=1;
+        // }
+    }
+    if (checkflag!=0)
+        std::cout << "context wrong " << checkflag << std::endl;
+    else   
+        std::cout << "context all correct " << checkflag << std::endl;
+
+    }
 
     std::cout << "Main: Generating PIR parameters" << std::endl;
     PirParams pir_params;
     gen_pir_params(number_of_items, size_per_item, d, *context, pir_params,
                    use_symmetric, use_batching, use_recursive_mod_switching);
+    //cpu
+    heoncpu::PirParams pir_params_cpu;
+    heoncpu::gen_pir_params(number_of_items, size_per_item, d, *context_cpu, pir_params_cpu,
+                   use_symmetric, use_batching, use_recursive_mod_switching);
+
+    //test consistence
+    {
+        int checkflag=0; 
+        if(pir_params.expansion_ratio!=pir_params_cpu.expansion_ratio)
+            checkflag+=1;
+        if (checkflag!=0)
+            std::cout << "pir_params wrong " << checkflag << std::endl;
+        else   
+            std::cout << "pir_params all correct " << checkflag << std::endl;
+
+    }
 
     std::cout << "Main: Generating PIR client" << std::endl;
     PIRClient client(context, pir_params);
