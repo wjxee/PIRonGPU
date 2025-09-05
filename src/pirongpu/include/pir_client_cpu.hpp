@@ -2,7 +2,7 @@
 
 #include "pir_cpu.hpp"
 
-namespace pironcpu
+namespace heoncpu
 {
 
     class PIRClient

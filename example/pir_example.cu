@@ -56,6 +56,7 @@
 #include "pir.cuh"
 #include "pir_cpu.hpp"
 #include "pir_client.cuh"
+#include "pir_client_cpu.hpp"
 #include "pir_server.cuh"
 #include "heoncpu.hpp"
 #include <omp.h>
@@ -147,9 +148,13 @@ int main(int argc, char* argv[])
 
     std::cout << "Main: Generating PIR client" << std::endl;
     PIRClient client(context, pir_params);
+    //cpu
+    heoncpu::PIRClient client_cpu(context_cpu, pir_params_cpu);
 
     std::cout << "Main: Generating galois keys for client" << std::endl;
     heongpu::Galoiskey galois_keys = client.generate_galois_keys();
+
+
 
     ////////////////////////////////
     int query_count = 4; // Total query count
