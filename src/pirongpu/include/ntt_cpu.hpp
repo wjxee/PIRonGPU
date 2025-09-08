@@ -56,7 +56,7 @@ namespace heoncpu
         NTTLayout ntt_layout;
         ReductionPolynomial reduction_poly;
         bool zero_padding;
-        // Ninverse<T>* mod_inverse;
+        Ninverse<T>* mod_inverse;
         // cudaStream_t stream;
     };
 

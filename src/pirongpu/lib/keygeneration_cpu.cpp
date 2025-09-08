@@ -721,51 +721,51 @@ namespace heoncpu
 //     /////////////////////////////////////////////////////////////////////////////////////
 //     // Galois Key Generation
 
-//     int steps_to_galois_elt(int steps, int coeff_count, int group_order)
-//     {
-//         int n = coeff_count;
-//         int m32 = n * 2;
-//         int m = m32;
+    int steps_to_galois_elt(int steps, int coeff_count, int group_order)
+    {
+        int n = coeff_count;
+        int m32 = n * 2;
+        int m = m32;
 
-//         if (steps == 0)
-//         {
-//             return m - 1;
-//         }
-//         else
-//         {
-//             int sign = steps < 0;
-//             int pos_steps = abs(steps);
+        if (steps == 0)
+        {
+            return m - 1;
+        }
+        else
+        {
+            int sign = steps < 0;
+            int pos_steps = abs(steps);
 
-//             if (pos_steps >= (n >> 1))
-//             {
-//                 std::cerr
-//                     << "Galois Key can not be generated, Step count too large "
-//                     << std::endl;
-//                 return 0;
-//             }
+            if (pos_steps >= (n >> 1))
+            {
+                std::cerr
+                    << "Galois Key can not be generated, Step count too large "
+                    << std::endl;
+                return 0;
+            }
 
-//             if (sign)
-//             {
-//                 steps = (n >> 1) - pos_steps;
-//             }
-//             else
-//             {
-//                 steps = pos_steps;
-//             }
+            if (sign)
+            {
+                steps = (n >> 1) - pos_steps;
+            }
+            else
+            {
+                steps = pos_steps;
+            }
 
-//             int gen = group_order; // 5; //3;
-//             int galois_elt = 1;
-//             while (steps > 0)
-//             {
-//                 galois_elt = galois_elt * gen;
-//                 galois_elt = galois_elt & (m - 1);
+            int gen = group_order; // 5; //3;
+            int galois_elt = 1;
+            while (steps > 0)
+            {
+                galois_elt = galois_elt * gen;
+                galois_elt = galois_elt & (m - 1);
 
-//                 steps = steps - 1;
-//             }
+                steps = steps - 1;
+            }
 
-//             return galois_elt;
-//         }
-//     }
+            return galois_elt;
+        }
+    }
 
 //     __device__ int bitreverse_gpu(int index, int n_power)
 //     {
@@ -779,20 +779,20 @@ namespace heoncpu
 //         return res_1;
 //     }
 
-//     __device__ int permutation(int index, int galois_elt, int coeff_count,
-//                                int n_power)
-//     {
-//         int coeff_count_minus_one = coeff_count - 1;
-//         int i = index + coeff_count;
+    int permutation(int index, int galois_elt, int coeff_count,
+                               int n_power)
+    {
+        int coeff_count_minus_one = coeff_count - 1;
+        int i = index + coeff_count;
 
-//         int reversed = bitreverse_gpu(i, n_power + 1);
+        int reversed = bitreverse(i, n_power + 1);
 
-//         int index_raw = (galois_elt * reversed) >> 1;
+        int index_raw = (galois_elt * reversed) >> 1;
 
-//         index_raw = index_raw & coeff_count_minus_one;
+        index_raw = index_raw & coeff_count_minus_one;
 
-//         return bitreverse_gpu(index_raw, n_power);
-//     }
+        return bitreverse(index_raw, n_power);
+    }
 
 //     __global__ void galoiskey_gen_kernel(Data64* galois_key, Data64* secret_key,
 //                                          Data64* error_poly, Data64* a_poly,
@@ -843,7 +843,71 @@ namespace heoncpu
 //                        (rns_mod_count << n_power)] = a;
 //         }
 //     }
-
+    void galoiskey_gen_cpu(
+        Data64* galois_key, Data64* secret_key, Data64* error_poly, Data64* a_poly,
+        Modulus64* modulus, Data64* factor, int galois_elt, int n_power, int rns_mod_count,
+        int grid_x, int grid_y, int grid_z, int block_size) {
+        
+        int n = 1 << n_power; // 计算n
+        int coeff_count = n;   // 系数数量等于n
+        
+        // 遍历所有网格和块
+        for (int block_z = 0; block_z < grid_z; block_z++) {
+            for (int block_y = 0; block_y < grid_y; block_y++) {
+                for (int block_x = 0; block_x < grid_x; block_x++) {
+                    // 处理当前块中的所有线程
+                    for (int thread_idx = 0; thread_idx < block_size; thread_idx++) {
+                        // 计算全局索引
+                        int idx = block_x * block_size + thread_idx;
+                        
+                        if (idx >= n) {
+                            continue; // 确保不超出范围
+                        }
+                        
+                        // 计算位置偏移量
+                        int location1 = block_y << n_power;
+                        
+                        // 计算置换位置
+                        int permutation_location = permutation(idx, galois_elt, coeff_count, n_power);
+                        
+                        // 获取置换后的密钥
+                        Data64 sk_permutation = secret_key[location1 + permutation_location];
+                        
+                        // 循环处理每个RNS模数
+                        for (int i = 0; i < rns_mod_count - 1; i++) {
+                            // 获取误差多项式和高斯多项式值
+                            int error_offset = idx + location1 + ((rns_mod_count * i) << n_power);
+                            int a_offset = idx + location1 + ((rns_mod_count * i) << n_power);
+                            
+                            Data64 e = error_poly[error_offset];
+                            Data64 a = a_poly[a_offset];
+                            
+                            // 计算Galois密钥的第一部分
+                            Data64 gk_0 = OPERATOR64::mult(sk_permutation, a, modulus[block_y]);
+                            gk_0 = OPERATOR64::add(gk_0, e, modulus[block_y]);
+                            Data64 zero = 0;
+                            gk_0 = OPERATOR64::sub(zero, gk_0, modulus[block_y]);
+                            
+                            // 如果当前索引等于块Y索引，添加额外项
+                            if (i == block_y) {
+                                Data64 sk = secret_key[idx + location1];
+                                sk = OPERATOR64::mult(sk, factor[block_y], modulus[block_y]);
+                                gk_0 = OPERATOR64::add(gk_0, sk, modulus[block_y]);
+                            }
+                            
+                            // 计算Galois密钥存储位置
+                            int galois_offset1 = idx + location1 + ((rns_mod_count * i) << (n_power + 1));
+                            int galois_offset2 = galois_offset1 + (rns_mod_count << n_power);
+                            
+                            // 存储Galois密钥
+                            galois_key[galois_offset1] = gk_0;
+                            galois_key[galois_offset2] = a;
+                        }
+                    }
+                }
+            }
+        }
+    }
 //     __global__ void galoiskey_gen_II_kernel(
 //         Data64* galois_key_temp, Data64* secret_key, Data64* error_poly,
 //         Data64* a_poly, Modulus64* modulus, Data64* factor, int galois_elt,
@@ -895,7 +959,80 @@ namespace heoncpu
 //                             (l_tilda << n_power)] = a;
 //         }
 //     }
-
+    void galoiskey_gen_II_cpu(
+        Data64* galois_key_temp, Data64* secret_key, Data64* error_poly, Data64* a_poly,
+        Modulus64* modulus, Data64* factor, int galois_elt, int* Sk_pair, int n_power,
+        int l_tilda, int d, int Q_size, int P_size,
+        int grid_x, int grid_y, int grid_z, int block_size) {
+        
+        int n = 1 << n_power; // 计算n
+        int coeff_count = n;   // 系数数量等于n
+        
+        // 遍历所有网格和块
+        for (int block_z = 0; block_z < grid_z; block_z++) {
+            for (int block_y = 0; block_y < grid_y; block_y++) {
+                for (int block_x = 0; block_x < grid_x; block_x++) {
+                    // 处理当前块中的所有线程
+                    for (int thread_idx = 0; thread_idx < block_size; thread_idx++) {
+                        // 计算全局索引
+                        int idx = block_x * block_size + thread_idx;
+                        
+                        if (idx >= n) {
+                            continue; // 确保不超出范围
+                        }
+                        
+                        // 计算位置偏移量
+                        int location1 = block_y << n_power;
+                        
+                        // 获取Sk_pair中的索引
+                        int Sk_index = Sk_pair[block_y];
+                        
+                        // 计算置换位置
+                        int permutation_location = permutation(idx, galois_elt, coeff_count, n_power);
+                        
+                        // 获取置换后的密钥
+                        Data64 sk_permutation = secret_key[location1 + permutation_location];
+                        
+                        // 循环处理d次
+                        for (int i = 0; i < d; i++) {
+                            // 获取误差多项式和高斯多项式值
+                            int error_offset = idx + location1 + ((l_tilda * i) << n_power);
+                            int a_offset = idx + location1 + ((l_tilda * i) << n_power);
+                            
+                            Data64 e = error_poly[error_offset];
+                            Data64 a = a_poly[a_offset];
+                            
+                            // 计算Galois密钥的第一部分
+                            Data64 rk_0 = OPERATOR64::mult(sk_permutation, a, modulus[block_y]);
+                            rk_0 = OPERATOR64::add(rk_0, e, modulus[block_y]);
+                            Data64 zero = 0;
+                            rk_0 = OPERATOR64::sub(zero, rk_0, modulus[block_y]);
+                            
+                            // 如果当前索引等于Sk_index，添加额外项
+                            if (i == Sk_index) {
+                                Data64 sk = secret_key[idx + location1];
+                                
+                                // 对sk应用P_size次因子乘法
+                                for (int j = 0; j < P_size; j++) {
+                                    sk = OPERATOR64::mult(sk, factor[(j * Q_size) + block_y], modulus[block_y]);
+                                }
+                                
+                                rk_0 = OPERATOR64::add(rk_0, sk, modulus[block_y]);
+                            }
+                            
+                            // 计算Galois密钥存储位置
+                            int galois_offset1 = idx + location1 + ((l_tilda * i) << (n_power + 1));
+                            int galois_offset2 = galois_offset1 + (l_tilda << n_power);
+                            
+                            // 存储Galois密钥
+                            galois_key_temp[galois_offset1] = rk_0;
+                            galois_key_temp[galois_offset2] = a;
+                        }
+                    }
+                }
+            }
+        }
+    }
 //     /////////////////////
 
 //     __global__ void multi_party_galoiskey_gen_method_I_II_kernel(

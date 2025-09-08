@@ -125,19 +125,23 @@ namespace heoncpu
 
         // modular_uniform_random_number_generation_kernel<<<dim3((n >> 8), 1, 1),
         //                                                   256, 0>>>(
-        //     a_poly, modulus_->data(), n_power, Q_prime_size_, seed_, offset_);
-        modular_uniform_random_number_generation_cpu(
-            a_poly, modulus_->data(), n_power, Q_prime_size_, seed_, offset_);
+        //     a_poly, modulus_->data(), n_power, Q_prime_size_, seed_, offset_); 
         // HEONGPU_CUDA_CHECK(cudaGetLastError());
+        modular_uniform_random_number_generation_cpu(
+            a_poly, modulus_->data(), n_power, Q_prime_size_,
+            n >> 8, 1, 1, 256, // grid_x, grid_y, grid_z, block_size
+            seed_, offset_);
         offset_++;
 
         // modular_gaussian_random_number_generation_kernel<<<dim3((n >> 8), 1, 1),
         //                                                    256, 0>>>(
         //     error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
         //     offset_);
-        // HEONGPU_CUDA_CHECK(cudaGetLastError());
+        // HEONGPU_CUDA_CHECK(cudaGetLastError()); 
         modular_gaussian_random_number_generation_cpu(
-            error_poly, modulus_->data(), n_power, Q_prime_size_, seed_, offset_);
+            error_poly, modulus_->data(), n_power, Q_prime_size_,
+            n >> 8, 1, 1, 256, // grid_x, grid_y, grid_z, block_size
+            seed_, offset_);    
         offset_++;
 
         ntt_rns_configuration<Data64> cfg_ntt = {
@@ -1391,448 +1395,551 @@ namespace heoncpu
     //     }
     // }
 
-    // void
-    // HEKeyGenerator::generate_galois_key_method_I(Galoiskey& gk, Secretkey& sk,
-    //                                              const )
-    // {
-    //     std::vector<Data64> errors_a(2 * Q_prime_size_ * Q_size_ * n);
-    //     Data64* error_poly = errors_a.data();
-    //     Data64* a_poly = error_poly + (Q_prime_size_ * Q_size_ * n);
+    void
+    HEKeyGenerator::generate_galois_key_method_I(Galoiskey& gk, Secretkey& sk )
+    {
+        std::vector<Data64> errors_a(2 * Q_prime_size_ * Q_size_ * n);
+        Data64* error_poly = errors_a.data();
+        Data64* a_poly = error_poly + (Q_prime_size_ * Q_size_ * n);
 
-    //     if (!gk.customized)
-    //     {
-    //         // Positive Row Shift
-    //         for (auto& galois : gk.galois_elt)
-    //         {
-    //             modular_uniform_random_number_generation_kernel<<<
-    //                 dim3((n >> 8), Q_size_, 1), 256, 0>>>(
-    //                 a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
-    //                 offset_);
-    //             HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //             offset_++;
+        if (!gk.customized)
+        {
+            // Positive Row Shift
+            for (auto& galois : gk.galois_elt)
+            {
+                // modular_uniform_random_number_generation_kernel<<<
+                //     dim3((n >> 8), Q_size_, 1), 256, 0>>>(
+                //     a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
+                //     offset_);
+                // HEONGPU_CUDA_CHECK(cudaGetLastError());
+                modular_uniform_random_number_generation_cpu(
+                    a_poly, modulus_->data(), n_power, Q_prime_size_,
+                    n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                    seed_, offset_);
+                offset_++;
 
-    //             modular_gaussian_random_number_generation_kernel<<<
-    //                 dim3((n >> 8), Q_size_, 1), 256, 0>>>(
-    //                 error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
-    //                 offset_);
-    //             HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //             offset_++;
+                // modular_gaussian_random_number_generation_kernel<<<
+                //     dim3((n >> 8), Q_size_, 1), 256, 0>>>(
+                //     error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
+                //     offset_);
+                // HEONGPU_CUDA_CHECK(cudaGetLastError());
+                modular_gaussian_random_number_generation_cpu(
+                    error_poly, modulus_->data(), n_power, Q_prime_size_,
+                    n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                    seed_, offset_);
+                offset_++;
 
-    //             ntt_rns_configuration<Data64> cfg_ntt = {
-    //                 .n_power = n_power,
-    //                 .ntt_type = FORWARD,
-    //                 .reduction_poly = ReductionPolynomial::X_N_plus,
-    //                 .zero_padding = false,
-    //                 .stream = stream};
+                ntt_rns_configuration<Data64> cfg_ntt = {
+                    .n_power = n_power,
+                    .ntt_type = FORWARD,
+                    .reduction_poly = ReductionPolynomial::X_N_plus,
+                    .zero_padding = false};
 
-    //             GPU_NTT_Inplace(error_poly, ntt_table_->data(),
-    //                             modulus_->data(), cfg_ntt,
-    //                             Q_size_ * Q_prime_size_, Q_prime_size_);
-    //             HEONGPU_CUDA_CHECK(cudaGetLastError());
+                GPU_NTT_Inplace(error_poly, ntt_table_->data(),
+                                modulus_->data(), cfg_ntt,
+                                Q_size_ * Q_prime_size_, Q_prime_size_);
+                // HEONGPU_CUDA_CHECK(cudaGetLastError());
 
-    //             int inv_galois = modInverse(galois.second, 2 * n);
+                int inv_galois = modInverse(galois.second, 2 * n);
 
-    //             gk.device_location_[galois.second] =
-    //                 std::vector<Data64>(gk.galoiskey_size_);
-    //             galoiskey_gen_kernel<<<dim3((n >> 8), Q_prime_size_, 1), 256, 0,
-    //                                    stream>>>(
-    //                 gk.device_location_[galois.second].data(), sk.data(),
-    //                 error_poly, a_poly, modulus_->data(), factor_->data(),
-    //                 inv_galois, n_power, Q_prime_size_);
-    //             HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //         }
+                gk.host_location_[galois.second] =
+                    std::vector<Data64>(gk.galoiskey_size_);
+                // galoiskey_gen_kernel<<<dim3((n >> 8), Q_prime_size_, 1), 256, 0,
+                //                        stream>>>(
+                //     gk.host_location_[galois.second].data(), sk.data(),
+                //     error_poly, a_poly, modulus_->data(), factor_->data(),
+                //     inv_galois, n_power, Q_prime_size_);
+                // HEONGPU_CUDA_CHECK(cudaGetLastError());
+                galoiskey_gen_cpu(
+                    gk.host_location_[galois.second].data(), sk.data(), error_poly, a_poly,
+                    modulus_->data(), factor_->data(), inv_galois, n_power, Q_prime_size_,
+                    n >> 8, Q_prime_size_, 1, 256 // grid_x, grid_y, grid_z, block_size
+                );
+            }
 
-    //         // Columns Rotate
-    //         modular_uniform_random_number_generation_kernel<<<
-    //             dim3((n >> 8), Q_size_, 1), 256, 0>>>(
-    //             a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
-    //             offset_);
-    //         HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //         offset_++;
+            // Columns Rotate
+            // modular_uniform_random_number_generation_kernel<<<
+            //     dim3((n >> 8), Q_size_, 1), 256, 0>>>(
+            //     a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
+            //     offset_);
+            // HEONGPU_CUDA_CHECK(cudaGetLastError());
+            modular_uniform_random_number_generation_cpu(
+                    a_poly, modulus_->data(), n_power, Q_prime_size_,
+                    n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                    seed_, offset_);
+            offset_++;
 
-    //         modular_gaussian_random_number_generation_kernel<<<
-    //             dim3((n >> 8), Q_size_, 1), 256, 0>>>(
-    //             error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
-    //             offset_);
-    //         HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //         offset_++;
+            // modular_gaussian_random_number_generation_kernel<<<
+            //     dim3((n >> 8), Q_size_, 1), 256, 0>>>(
+            //     error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
+            //     offset_);
+            // HEONGPU_CUDA_CHECK(cudaGetLastError());
+            modular_gaussian_random_number_generation_cpu(
+                    error_poly, modulus_->data(), n_power, Q_prime_size_,
+                    n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                    seed_, offset_);
+            offset_++;
 
-    //         ntt_rns_configuration<Data64> cfg_ntt = {
-    //             .n_power = n_power,
-    //             .ntt_type = FORWARD,
-    //             .reduction_poly = ReductionPolynomial::X_N_plus,
-    //             .zero_padding = false,
-    //             .stream = stream};
+            ntt_rns_configuration<Data64> cfg_ntt = {
+                .n_power = n_power,
+                .ntt_type = FORWARD,
+                .reduction_poly = ReductionPolynomial::X_N_plus,
+                .zero_padding = false, };
 
-    //         GPU_NTT_Inplace(error_poly, ntt_table_->data(), modulus_->data(),
-    //                         cfg_ntt, Q_size_ * Q_prime_size_, Q_prime_size_);
-    //         HEONGPU_CUDA_CHECK(cudaGetLastError());
+            GPU_NTT_Inplace(error_poly, ntt_table_->data(), modulus_->data(),
+                            cfg_ntt, Q_size_ * Q_prime_size_, Q_prime_size_);
+            // HEONGPU_CUDA_CHECK(cudaGetLastError());
 
-    //         gk.zero_device_location_ =
-    //             std::vector<Data64>(gk.galoiskey_size_);
-    //         galoiskey_gen_kernel<<<dim3((n >> 8), Q_prime_size_, 1), 256, 0,
-    //                                stream>>>(
-    //             gk.zero_device_location_.data(), sk.data(), error_poly, a_poly,
-    //             modulus_->data(), factor_->data(), gk.galois_elt_zero, n_power,
-    //             Q_prime_size_);
-    //         HEONGPU_CUDA_CHECK(cudaGetLastError());
+            gk.zero_host_location_ =
+                std::vector<Data64>(gk.galoiskey_size_);
+            // galoiskey_gen_kernel<<<dim3((n >> 8), Q_prime_size_, 1), 256, 0,
+            //                        stream>>>(
+            //     gk.zero_host_location_.data(), sk.data(), error_poly, a_poly,
+            //     modulus_->data(), factor_->data(), gk.galois_elt_zero, n_power,
+            //     Q_prime_size_);
+            // HEONGPU_CUDA_CHECK(cudaGetLastError());
+            galoiskey_gen_cpu(
+                gk.zero_host_location_.data(), sk.data(), error_poly, a_poly,
+                modulus_->data(), factor_->data(), gk.galois_elt_zero, n_power, Q_prime_size_,
+                n >> 8, Q_prime_size_, 1, 256 // grid_x, grid_y, grid_z, block_size
+            );
 
-    //         if (gk.store_in_gpu_)
-    //         {
-    //             // pass
-    //         }
-    //         else
-    //         {
-    //             for (auto& galois_ : gk.device_location_)
-    //             {
-    //                 gk.host_location_[galois_.first] =
-    //                     HostVector<Data64>(gk.galoiskey_size_);
-    //                 cudaMemcpyAsync(gk.host_location_[galois_.first].data(),
-    //                                 galois_.second.data(),
-    //                                 gk.galoiskey_size_ * sizeof(Data64),
-    //                                 cudaMemcpyDeviceToHost);
-    //                 HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //             }
+            // if (gk.store_in_gpu_)
+            // {
+            //     // pass
+            // }
+            // else
+            // {
+            //     for (auto& galois_ : gk.device_location_)
+            //     {
+            //         gk.host_location_[galois_.first] =
+            //             HostVector<Data64>(gk.galoiskey_size_);
+            //         cudaMemcpyAsync(gk.host_location_[galois_.first].data(),
+            //                         galois_.second.data(),
+            //                         gk.galoiskey_size_ * sizeof(Data64),
+            //                         cudaMemcpyDeviceToHost);
+            //         HEONGPU_CUDA_CHECK(cudaGetLastError());
+            //     }
 
-    //             gk.zero_host_location_ = HostVector<Data64>(gk.galoiskey_size_);
-    //             cudaMemcpyAsync(gk.zero_host_location_.data(),
-    //                             gk.zero_device_location_.data(),
-    //                             gk.galoiskey_size_ * sizeof(Data64),
-    //                             cudaMemcpyDeviceToHost);
-    //             HEONGPU_CUDA_CHECK(cudaGetLastError());
+            //     gk.zero_host_location_ = HostVector<Data64>(gk.galoiskey_size_);
+            //     cudaMemcpyAsync(gk.zero_host_location_.data(),
+            //                     gk.zero_device_location_.data(),
+            //                     gk.galoiskey_size_ * sizeof(Data64),
+            //                     cudaMemcpyDeviceToHost);
+            //     HEONGPU_CUDA_CHECK(cudaGetLastError());
 
-    //             gk.device_location_.clear();
-    //             gk.zero_device_location_.resize(0);
-    //         }
-    //     }
-    //     else
-    //     {
-    //         for (auto& galois_ : gk.custom_galois_elt)
-    //         {
-    //             modular_uniform_random_number_generation_kernel<<<
-    //                 dim3((n >> 8), Q_size_, 1), 256, 0>>>(
-    //                 a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
-    //                 offset_);
-    //             HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //             offset_++;
+            //     gk.device_location_.clear();
+            //     gk.zero_device_location_.resize(0);
+            // }
+        }
+        else
+        {
+            for (auto& galois_ : gk.custom_galois_elt)
+            {
+                // modular_uniform_random_number_generation_kernel<<<
+                //     dim3((n >> 8), Q_size_, 1), 256, 0>>>(
+                //     a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
+                //     offset_);
+                // HEONGPU_CUDA_CHECK(cudaGetLastError());
+                modular_uniform_random_number_generation_cpu(
+                    a_poly, modulus_->data(), n_power, Q_prime_size_,
+                    n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                    seed_, offset_);
+                offset_++;
 
-    //             modular_gaussian_random_number_generation_kernel<<<
-    //                 dim3((n >> 8), Q_size_, 1), 256, 0>>>(
-    //                 error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
-    //                 offset_);
-    //             HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //             offset_++;
+                // modular_gaussian_random_number_generation_kernel<<<
+                //     dim3((n >> 8), Q_size_, 1), 256, 0>>>(
+                //     error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
+                //     offset_);
+                // HEONGPU_CUDA_CHECK(cudaGetLastError());
+                modular_gaussian_random_number_generation_cpu(
+                    error_poly, modulus_->data(), n_power, Q_prime_size_,
+                    n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                    seed_, offset_);
+                offset_++;
 
-    //             ntt_rns_configuration<Data64> cfg_ntt = {
-    //                 .n_power = n_power,
-    //                 .ntt_type = FORWARD,
-    //                 .reduction_poly = ReductionPolynomial::X_N_plus,
-    //                 .zero_padding = false,
-    //                 .stream = stream};
+                ntt_rns_configuration<Data64> cfg_ntt = {
+                    .n_power = n_power,
+                    .ntt_type = FORWARD,
+                    .reduction_poly = ReductionPolynomial::X_N_plus,
+                    .zero_padding = false, };
 
-    //             GPU_NTT_Inplace(error_poly, ntt_table_->data(),
-    //                             modulus_->data(), cfg_ntt,
-    //                             Q_size_ * Q_prime_size_, Q_prime_size_);
-    //             HEONGPU_CUDA_CHECK(cudaGetLastError());
+                GPU_NTT_Inplace(error_poly, ntt_table_->data(),
+                                modulus_->data(), cfg_ntt,
+                                Q_size_ * Q_prime_size_, Q_prime_size_);
+                // HEONGPU_CUDA_CHECK(cudaGetLastError());
 
-    //             int inv_galois = modInverse(galois_, 2 * n);
+                int inv_galois = modInverse(galois_, 2 * n);
 
-    //             gk.device_location_[galois_] =
-    //                 std::vector<Data64>(gk.galoiskey_size_);
-    //             galoiskey_gen_kernel<<<dim3((n >> 8), Q_prime_size_, 1), 256, 0,
-    //                                    stream>>>(
-    //                 gk.device_location_[galois_].data(), sk.data(), error_poly,
-    //                 a_poly, modulus_->data(), factor_->data(), inv_galois,
-    //                 n_power, Q_prime_size_);
-    //             HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //         }
+                gk.host_location_[galois_] =
+                    std::vector<Data64>(gk.galoiskey_size_);
+                // galoiskey_gen_kernel<<<dim3((n >> 8), Q_prime_size_, 1), 256, 0,
+                //                        stream>>>(
+                //     gk.device_location_[galois_].data(), sk.data(), error_poly,
+                //     a_poly, modulus_->data(), factor_->data(), inv_galois,
+                //     n_power, Q_prime_size_);
+                // HEONGPU_CUDA_CHECK(cudaGetLastError());
+                galoiskey_gen_cpu(
+                    gk.host_location_[galois_].data(), sk.data(), error_poly, a_poly,
+                    modulus_->data(), factor_->data(), inv_galois, n_power, Q_prime_size_,
+                    n >> 8, Q_prime_size_, 1, 256 // grid_x, grid_y, grid_z, block_size
+                );
+                
+            }
 
-    //         // Columns Rotate
-    //         modular_uniform_random_number_generation_kernel<<<
-    //             dim3((n >> 8), Q_size_, 1), 256, 0>>>(
-    //             a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
-    //             offset_);
-    //         HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //         offset_++;
+            // Columns Rotate
+            // modular_uniform_random_number_generation_kernel<<<
+            //     dim3((n >> 8), Q_size_, 1), 256, 0>>>(
+            //     a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
+            //     offset_);
+            // HEONGPU_CUDA_CHECK(cudaGetLastError());
+            modular_uniform_random_number_generation_cpu(
+                    a_poly, modulus_->data(), n_power, Q_prime_size_,
+                    n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                    seed_, offset_);
+            offset_++;
 
-    //         modular_gaussian_random_number_generation_kernel<<<
-    //             dim3((n >> 8), Q_size_, 1), 256, 0>>>(
-    //             error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
-    //             offset_);
-    //         HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //         offset_++;
+            // modular_gaussian_random_number_generation_kernel<<<
+            //     dim3((n >> 8), Q_size_, 1), 256, 0>>>(
+            //     error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
+            //     offset_);
+            // HEONGPU_CUDA_CHECK(cudaGetLastError());
+            modular_gaussian_random_number_generation_cpu(
+                    error_poly, modulus_->data(), n_power, Q_prime_size_,
+                    n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                    seed_, offset_);
+            offset_++;
 
-    //         ntt_rns_configuration<Data64> cfg_ntt = {
-    //             .n_power = n_power,
-    //             .ntt_type = FORWARD,
-    //             .reduction_poly = ReductionPolynomial::X_N_plus,
-    //             .zero_padding = false,
-    //             .stream = stream};
+            ntt_rns_configuration<Data64> cfg_ntt = {
+                .n_power = n_power,
+                .ntt_type = FORWARD,
+                .reduction_poly = ReductionPolynomial::X_N_plus,
+                .zero_padding = false,
+                 };
 
-    //         GPU_NTT_Inplace(error_poly, ntt_table_->data(), modulus_->data(),
-    //                         cfg_ntt, Q_size_ * Q_prime_size_, Q_prime_size_);
-    //         HEONGPU_CUDA_CHECK(cudaGetLastError());
+            GPU_NTT_Inplace(error_poly, ntt_table_->data(), modulus_->data(),
+                            cfg_ntt, Q_size_ * Q_prime_size_, Q_prime_size_);
+            // HEONGPU_CUDA_CHECK(cudaGetLastError());
 
-    //         gk.zero_device_location_ =
-    //             std::vector<Data64>(gk.galoiskey_size_);
-    //         galoiskey_gen_kernel<<<dim3((n >> 8), Q_prime_size_, 1), 256, 0,
-    //                                stream>>>(
-    //             gk.zero_device_location_.data(), sk.data(), error_poly, a_poly,
-    //             modulus_->data(), factor_->data(), gk.galois_elt_zero, n_power,
-    //             Q_prime_size_);
-    //         HEONGPU_CUDA_CHECK(cudaGetLastError());
+            gk.zero_host_location_ =
+                std::vector<Data64>(gk.galoiskey_size_);
+            // galoiskey_gen_kernel<<<dim3((n >> 8), Q_prime_size_, 1), 256, 0,
+            //                        stream>>>(
+            //     gk.zero_device_location_.data(), sk.data(), error_poly, a_poly,
+            //     modulus_->data(), factor_->data(), gk.galois_elt_zero, n_power,
+            //     Q_prime_size_);
+            // HEONGPU_CUDA_CHECK(cudaGetLastError());
+            galoiskey_gen_cpu(
+                    gk.zero_host_location_.data(), sk.data(), error_poly, a_poly,
+                    modulus_->data(), factor_->data(), gk.galois_elt_zero, n_power, Q_prime_size_,
+                    n >> 8, Q_prime_size_, 1, 256 // grid_x, grid_y, grid_z, block_size
+                );
 
-    //         if (gk.store_in_gpu_)
-    //         {
-    //             // pass
-    //         }
-    //         else
-    //         {
-    //             for (auto& galois_ : gk.device_location_)
-    //             {
-    //                 gk.host_location_[galois_.first] =
-    //                     HostVector<Data64>(gk.galoiskey_size_);
-    //                 cudaMemcpyAsync(gk.host_location_[galois_.first].data(),
-    //                                 galois_.second.data(),
-    //                                 gk.galoiskey_size_ * sizeof(Data64),
-    //                                 cudaMemcpyDeviceToHost);
-    //                 HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //             }
+            // if (gk.store_in_gpu_)
+            // {
+            //     // pass
+            // }
+            // else
+            // {
+            //     for (auto& galois_ : gk.device_location_)
+            //     {
+            //         gk.host_location_[galois_.first] =
+            //             HostVector<Data64>(gk.galoiskey_size_);
+            //         cudaMemcpyAsync(gk.host_location_[galois_.first].data(),
+            //                         galois_.second.data(),
+            //                         gk.galoiskey_size_ * sizeof(Data64),
+            //                         cudaMemcpyDeviceToHost);
+            //         HEONGPU_CUDA_CHECK(cudaGetLastError());
+            //     }
 
-    //             gk.zero_host_location_ = HostVector<Data64>(gk.galoiskey_size_);
-    //             cudaMemcpyAsync(gk.zero_host_location_.data(),
-    //                             gk.zero_device_location_.data(),
-    //                             gk.galoiskey_size_ * sizeof(Data64),
-    //                             cudaMemcpyDeviceToHost);
-    //             HEONGPU_CUDA_CHECK(cudaGetLastError());
+            //     gk.zero_host_location_ = HostVector<Data64>(gk.galoiskey_size_);
+            //     cudaMemcpyAsync(gk.zero_host_location_.data(),
+            //                     gk.zero_device_location_.data(),
+            //                     gk.galoiskey_size_ * sizeof(Data64),
+            //                     cudaMemcpyDeviceToHost);
+            //     HEONGPU_CUDA_CHECK(cudaGetLastError());
 
-    //             gk.device_location_.clear();
-    //             gk.zero_device_location_.resize(0);
-    //         }
-    //     }
-    // }
+            //     gk.device_location_.clear();
+            //     gk.zero_device_location_.resize(0);
+            // }
+        }
+    }
 
-    // void HEKeyGenerator::generate_bfv_galois_key_method_II(
-    //     Galoiskey& gk, Secretkey& sk, const )
-    // {
-    //     std::vector<Data64> errors_a(2 * Q_prime_size_ * d_ * n);
-    //     Data64* error_poly = errors_a.data();
-    //     Data64* a_poly = error_poly + (Q_prime_size_ * d_ * n);
+    void HEKeyGenerator::generate_bfv_galois_key_method_II(
+        Galoiskey& gk, Secretkey& sk)
+    {
+        std::vector<Data64> errors_a(2 * Q_prime_size_ * d_ * n);
+        Data64* error_poly = errors_a.data();
+        Data64* a_poly = error_poly + (Q_prime_size_ * d_ * n);
 
-    //     if (!gk.customized)
-    //     {
-    //         // Positive Row Shift
-    //         for (auto& galois : gk.galois_elt)
-    //         {
-    //             modular_uniform_random_number_generation_kernel<<<
-    //                 dim3((n >> 8), d_, 1), 256, 0>>>(
-    //                 a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
-    //                 offset_);
-    //             HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //             offset_++;
+        if (!gk.customized)
+        {
+            // Positive Row Shift
+            for (auto& galois : gk.galois_elt)
+            {
+                // modular_uniform_random_number_generation_kernel<<<
+                //     dim3((n >> 8), d_, 1), 256, 0>>>(
+                //     a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
+                //     offset_);
+                // HEONGPU_CUDA_CHECK(cudaGetLastError());
+                modular_uniform_random_number_generation_cpu(
+                    a_poly, modulus_->data(), n_power, Q_prime_size_,
+                    n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                    seed_, offset_);
+                offset_++;
 
-    //             modular_gaussian_random_number_generation_kernel<<<
-    //                 dim3((n >> 8), d_, 1), 256, 0>>>(
-    //                 error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
-    //                 offset_);
-    //             HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //             offset_++;
+                // modular_gaussian_random_number_generation_kernel<<<
+                //     dim3((n >> 8), d_, 1), 256, 0>>>(
+                //     error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
+                //     offset_);
+                // HEONGPU_CUDA_CHECK(cudaGetLastError());
+                modular_gaussian_random_number_generation_cpu(
+                    error_poly, modulus_->data(), n_power, Q_prime_size_,
+                    n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                    seed_, offset_);
+                offset_++;
 
-    //             ntt_rns_configuration<Data64> cfg_ntt = {
-    //                 .n_power = n_power,
-    //                 .ntt_type = FORWARD,
-    //                 .reduction_poly = ReductionPolynomial::X_N_plus,
-    //                 .zero_padding = false,
-    //                 .stream = stream};
+                ntt_rns_configuration<Data64> cfg_ntt = {
+                    .n_power = n_power,
+                    .ntt_type = FORWARD,
+                    .reduction_poly = ReductionPolynomial::X_N_plus,
+                    .zero_padding = false,
+                     };
 
-    //             GPU_NTT_Inplace(error_poly, ntt_table_->data(),
-    //                             modulus_->data(), cfg_ntt, d_ * Q_prime_size_,
-    //                             Q_prime_size_);
-    //             HEONGPU_CUDA_CHECK(cudaGetLastError());
+                GPU_NTT_Inplace(error_poly, ntt_table_->data(),
+                                modulus_->data(), cfg_ntt, d_ * Q_prime_size_,
+                                Q_prime_size_);
+                // HEONGPU_CUDA_CHECK(cudaGetLastError());
 
-    //             int inv_galois = modInverse(galois.second, 2 * n);
+                int inv_galois = modInverse(galois.second, 2 * n);
 
-    //             gk.device_location_[galois.second] =
-    //                 std::vector<Data64>(gk.galoiskey_size_);
-    //             galoiskey_gen_II_kernel<<<dim3((n >> 8), Q_prime_size_, 1), 256,
-    //                                       0>>>(
-    //                 gk.device_location_[galois.second].data(), sk.data(),
-    //                 error_poly, a_poly, modulus_->data(), factor_->data(),
-    //                 inv_galois, Sk_pair_->data(), n_power, Q_prime_size_, d_,
-    //                 Q_size_, P_size_);
-    //             HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //         }
+                gk.host_location_[galois.second] =
+                    std::vector<Data64>(gk.galoiskey_size_);
+                // galoiskey_gen_II_kernel<<<dim3((n >> 8), Q_prime_size_, 1), 256,
+                //                           0>>>(
+                //     gk.device_location_[galois.second].data(), sk.data(),
+                //     error_poly, a_poly, modulus_->data(), factor_->data(),
+                //     inv_galois, Sk_pair_->data(), n_power, Q_prime_size_, d_,
+                //     Q_size_, P_size_);
+                // HEONGPU_CUDA_CHECK(cudaGetLastError());
+                galoiskey_gen_II_cpu(
+                    gk.host_location_[galois.second].data(), sk.data(), error_poly, a_poly,
+                    modulus_->data(), factor_->data(), inv_galois, Sk_pair_->data(), n_power,
+                    Q_prime_size_, d_, Q_size_, P_size_,
+                    n >> 8, Q_prime_size_, 1, 256 // grid_x, grid_y, grid_z, block_size
+                );
+            }
 
-    //         // Columns Rotate
-    //         modular_uniform_random_number_generation_kernel<<<
-    //             dim3((n >> 8), d_, 1), 256, 0>>>(
-    //             a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
-    //             offset_);
-    //         HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //         offset_++;
+            // Columns Rotate
+            // modular_uniform_random_number_generation_kernel<<<
+            //     dim3((n >> 8), d_, 1), 256, 0>>>(
+            //     a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
+            //     offset_);
+            // HEONGPU_CUDA_CHECK(cudaGetLastError());
+            modular_uniform_random_number_generation_cpu(
+                    a_poly, modulus_->data(), n_power, Q_prime_size_,
+                    n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                    seed_, offset_);
+            offset_++;
 
-    //         modular_gaussian_random_number_generation_kernel<<<
-    //             dim3((n >> 8), d_, 1), 256, 0>>>(
-    //             error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
-    //             offset_);
-    //         HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //         offset_++;
+            // modular_gaussian_random_number_generation_kernel<<<
+            //     dim3((n >> 8), d_, 1), 256, 0>>>(
+            //     error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
+            //     offset_);
+            // HEONGPU_CUDA_CHECK(cudaGetLastError());
+            modular_gaussian_random_number_generation_cpu(
+                    error_poly, modulus_->data(), n_power, Q_prime_size_,
+                    n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                    seed_, offset_);
+            offset_++;
 
-    //         ntt_rns_configuration<Data64> cfg_ntt = {
-    //             .n_power = n_power,
-    //             .ntt_type = FORWARD,
-    //             .reduction_poly = ReductionPolynomial::X_N_plus,
-    //             .zero_padding = false,
-    //             .stream = stream};
+            ntt_rns_configuration<Data64> cfg_ntt = {
+                .n_power = n_power,
+                .ntt_type = FORWARD,
+                .reduction_poly = ReductionPolynomial::X_N_plus,
+                .zero_padding = false,
+                 };
 
-    //         GPU_NTT_Inplace(error_poly, ntt_table_->data(), modulus_->data(),
-    //                         cfg_ntt, d_ * Q_prime_size_, Q_prime_size_);
-    //         HEONGPU_CUDA_CHECK(cudaGetLastError());
+            GPU_NTT_Inplace(error_poly, ntt_table_->data(), modulus_->data(),
+                            cfg_ntt, d_ * Q_prime_size_, Q_prime_size_);
+            // HEONGPU_CUDA_CHECK(cudaGetLastError());
 
-    //         gk.zero_device_location_ =
-    //             std::vector<Data64>(gk.galoiskey_size_);
-    //         galoiskey_gen_II_kernel<<<dim3((n >> 8), Q_prime_size_, 1), 256, 0,
-    //                                   stream>>>(
-    //             gk.zero_device_location_.data(), sk.data(), error_poly, a_poly,
-    //             modulus_->data(), factor_->data(), gk.galois_elt_zero,
-    //             Sk_pair_->data(), n_power, Q_prime_size_, d_, Q_size_, P_size_);
-    //         HEONGPU_CUDA_CHECK(cudaGetLastError());
+            gk.zero_host_location_ =
+                std::vector<Data64>(gk.galoiskey_size_);
+            // galoiskey_gen_II_kernel<<<dim3((n >> 8), Q_prime_size_, 1), 256, 0,
+            //                           stream>>>(
+            //     gk.zero_device_location_.data(), sk.data(), error_poly, a_poly,
+            //     modulus_->data(), factor_->data(), gk.galois_elt_zero,
+            //     Sk_pair_->data(), n_power, Q_prime_size_, d_, Q_size_, P_size_);
+            // HEONGPU_CUDA_CHECK(cudaGetLastError());
+            galoiskey_gen_II_cpu(
+                gk.zero_host_location_.data(), sk.data(), error_poly, a_poly,
+                modulus_->data(), factor_->data(), gk.galois_elt_zero, Sk_pair_->data(), n_power,
+                Q_prime_size_, d_, Q_size_, P_size_,
+                n >> 8, Q_prime_size_, 1, 256 // grid_x, grid_y, grid_z, block_size
+            );                            
+            // if (gk.store_in_gpu_)
+            // {
+            //     // pass
+            // }
+            // else
+            // {
+            //     for (auto& galois_ : gk.device_location_)
+            //     {
+            //         gk.host_location_[galois_.first] =
+            //             HostVector<Data64>(gk.galoiskey_size_);
+            //         cudaMemcpyAsync(gk.host_location_[galois_.first].data(),
+            //                         galois_.second.data(),
+            //                         gk.galoiskey_size_ * sizeof(Data64),
+            //                         cudaMemcpyDeviceToHost);
+            //         HEONGPU_CUDA_CHECK(cudaGetLastError());
+            //     }
 
-    //         if (gk.store_in_gpu_)
-    //         {
-    //             // pass
-    //         }
-    //         else
-    //         {
-    //             for (auto& galois_ : gk.device_location_)
-    //             {
-    //                 gk.host_location_[galois_.first] =
-    //                     HostVector<Data64>(gk.galoiskey_size_);
-    //                 cudaMemcpyAsync(gk.host_location_[galois_.first].data(),
-    //                                 galois_.second.data(),
-    //                                 gk.galoiskey_size_ * sizeof(Data64),
-    //                                 cudaMemcpyDeviceToHost);
-    //                 HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //             }
+            //     gk.zero_host_location_ = HostVector<Data64>(gk.galoiskey_size_);
+            //     cudaMemcpyAsync(gk.zero_host_location_.data(),
+            //                     gk.zero_device_location_.data(),
+            //                     gk.galoiskey_size_ * sizeof(Data64),
+            //                     cudaMemcpyDeviceToHost);
+            //     HEONGPU_CUDA_CHECK(cudaGetLastError());
 
-    //             gk.zero_host_location_ = HostVector<Data64>(gk.galoiskey_size_);
-    //             cudaMemcpyAsync(gk.zero_host_location_.data(),
-    //                             gk.zero_device_location_.data(),
-    //                             gk.galoiskey_size_ * sizeof(Data64),
-    //                             cudaMemcpyDeviceToHost);
-    //             HEONGPU_CUDA_CHECK(cudaGetLastError());
+            //     gk.device_location_.clear();
+            //     gk.zero_device_location_.resize(0);
+            // }
+        }
+        else
+        {
+            for (auto& galois_ : gk.custom_galois_elt)
+            {
+                // modular_uniform_random_number_generation_kernel<<<
+                //     dim3((n >> 8), d_, 1), 256, 0>>>(
+                //     a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
+                //     offset_);
+                // HEONGPU_CUDA_CHECK(cudaGetLastError());
+                modular_uniform_random_number_generation_cpu(
+                    a_poly, modulus_->data(), n_power, Q_prime_size_,
+                    n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                    seed_, offset_);
+                offset_++;
 
-    //             gk.device_location_.clear();
-    //             gk.zero_device_location_.resize(0);
-    //         }
-    //     }
-    //     else
-    //     {
-    //         for (auto& galois_ : gk.custom_galois_elt)
-    //         {
-    //             modular_uniform_random_number_generation_kernel<<<
-    //                 dim3((n >> 8), d_, 1), 256, 0>>>(
-    //                 a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
-    //                 offset_);
-    //             HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //             offset_++;
+                // modular_gaussian_random_number_generation_kernel<<<
+                //     dim3((n >> 8), d_, 1), 256, 0>>>(
+                //     error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
+                //     offset_);
+                // HEONGPU_CUDA_CHECK(cudaGetLastError());
+                modular_gaussian_random_number_generation_cpu(
+                    error_poly, modulus_->data(), n_power, Q_prime_size_,
+                    n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                    seed_, offset_);
+                offset_++;
 
-    //             modular_gaussian_random_number_generation_kernel<<<
-    //                 dim3((n >> 8), d_, 1), 256, 0>>>(
-    //                 error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
-    //                 offset_);
-    //             HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //             offset_++;
+                ntt_rns_configuration<Data64> cfg_ntt = {
+                    .n_power = n_power,
+                    .ntt_type = FORWARD,
+                    .reduction_poly = ReductionPolynomial::X_N_plus,
+                    .zero_padding = false,
+                     };
 
-    //             ntt_rns_configuration<Data64> cfg_ntt = {
-    //                 .n_power = n_power,
-    //                 .ntt_type = FORWARD,
-    //                 .reduction_poly = ReductionPolynomial::X_N_plus,
-    //                 .zero_padding = false,
-    //                 .stream = stream};
+                GPU_NTT_Inplace(error_poly, ntt_table_->data(),
+                                modulus_->data(), cfg_ntt, d_ * Q_prime_size_,
+                                Q_prime_size_);
+                // HEONGPU_CUDA_CHECK(cudaGetLastError());
 
-    //             GPU_NTT_Inplace(error_poly, ntt_table_->data(),
-    //                             modulus_->data(), cfg_ntt, d_ * Q_prime_size_,
-    //                             Q_prime_size_);
-    //             HEONGPU_CUDA_CHECK(cudaGetLastError());
+                int inv_galois = modInverse(galois_, 2 * n);
 
-    //             int inv_galois = modInverse(galois_, 2 * n);
+                gk.host_location_[galois_] =
+                    std::vector<Data64>(gk.galoiskey_size_);
+                // galoiskey_gen_II_kernel<<<dim3((n >> 8), Q_prime_size_, 1), 256,
+                //                           0>>>(
+                //     gk.device_location_[galois_].data(), sk.data(), error_poly,
+                //     a_poly, modulus_->data(), factor_->data(), inv_galois,
+                //     Sk_pair_->data(), n_power, Q_prime_size_, d_, Q_size_,
+                //     P_size_);
+                // HEONGPU_CUDA_CHECK(cudaGetLastError());
+                galoiskey_gen_II_cpu(
+                    gk.host_location_[galois_].data(), sk.data(), error_poly, a_poly,
+                    modulus_->data(), factor_->data(), inv_galois, Sk_pair_->data(), n_power,
+                    Q_prime_size_, d_, Q_size_, P_size_,
+                    n >> 8, Q_prime_size_, 1, 256 // grid_x, grid_y, grid_z, block_size
+                );
+            }
 
-    //             gk.device_location_[galois_] =
-    //                 std::vector<Data64>(gk.galoiskey_size_);
-    //             galoiskey_gen_II_kernel<<<dim3((n >> 8), Q_prime_size_, 1), 256,
-    //                                       0>>>(
-    //                 gk.device_location_[galois_].data(), sk.data(), error_poly,
-    //                 a_poly, modulus_->data(), factor_->data(), inv_galois,
-    //                 Sk_pair_->data(), n_power, Q_prime_size_, d_, Q_size_,
-    //                 P_size_);
-    //             HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //         }
+            // Columns Rotate
+            // modular_uniform_random_number_generation_kernel<<<
+            //     dim3((n >> 8), d_, 1), 256, 0>>>(
+            //     a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
+            //     offset_);
+            // HEONGPU_CUDA_CHECK(cudaGetLastError());
+            modular_uniform_random_number_generation_cpu(
+                    a_poly, modulus_->data(), n_power, Q_prime_size_,
+                    n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                    seed_, offset_);
+            offset_++;
 
-    //         // Columns Rotate
-    //         modular_uniform_random_number_generation_kernel<<<
-    //             dim3((n >> 8), d_, 1), 256, 0>>>(
-    //             a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
-    //             offset_);
-    //         HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //         offset_++;
+            // modular_gaussian_random_number_generation_kernel<<<
+            //     dim3((n >> 8), d_, 1), 256, 0>>>(
+            //     error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
+            //     offset_);
+            // HEONGPU_CUDA_CHECK(cudaGetLastError());
+            modular_gaussian_random_number_generation_cpu(
+                    error_poly, modulus_->data(), n_power, Q_prime_size_,
+                    n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                    seed_, offset_);
+            offset_++;
 
-    //         modular_gaussian_random_number_generation_kernel<<<
-    //             dim3((n >> 8), d_, 1), 256, 0>>>(
-    //             error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
-    //             offset_);
-    //         HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //         offset_++;
+            ntt_rns_configuration<Data64> cfg_ntt = {
+                .n_power = n_power,
+                .ntt_type = FORWARD,
+                .reduction_poly = ReductionPolynomial::X_N_plus,
+                .zero_padding = false,
+                 };
 
-    //         ntt_rns_configuration<Data64> cfg_ntt = {
-    //             .n_power = n_power,
-    //             .ntt_type = FORWARD,
-    //             .reduction_poly = ReductionPolynomial::X_N_plus,
-    //             .zero_padding = false,
-    //             .stream = stream};
+            GPU_NTT_Inplace(error_poly, ntt_table_->data(), modulus_->data(),
+                            cfg_ntt, d_ * Q_prime_size_, Q_prime_size_);
+            // HEONGPU_CUDA_CHECK(cudaGetLastError());
 
-    //         GPU_NTT_Inplace(error_poly, ntt_table_->data(), modulus_->data(),
-    //                         cfg_ntt, d_ * Q_prime_size_, Q_prime_size_);
-    //         HEONGPU_CUDA_CHECK(cudaGetLastError());
+            gk.zero_host_location_ =
+                std::vector<Data64>(gk.galoiskey_size_);
+            // galoiskey_gen_II_kernel<<<dim3((n >> 8), Q_prime_size_, 1), 256, 0,
+            //                           stream>>>(
+            //     gk.zero_device_location_.data(), sk.data(), error_poly, a_poly,
+            //     modulus_->data(), factor_->data(), gk.galois_elt_zero,
+            //     Sk_pair_->data(), n_power, Q_prime_size_, d_, Q_size_, P_size_);
+            // HEONGPU_CUDA_CHECK(cudaGetLastError());
+            galoiskey_gen_II_cpu(
+                gk.zero_host_location_.data(), sk.data(), error_poly, a_poly,
+                modulus_->data(), factor_->data(), gk.galois_elt_zero, Sk_pair_->data(), n_power,
+                Q_prime_size_, d_, Q_size_, P_size_,
+                n >> 8, Q_prime_size_, 1, 256 // grid_x, grid_y, grid_z, block_size
+            );                             
+            // if (gk.store_in_gpu_)
+            // {
+            //     // pass
+            // }
+            // else
+            // {
+            //     for (auto& galois_ : gk.device_location_)
+            //     {
+            //         gk.host_location_[galois_.first] =
+            //             HostVector<Data64>(gk.galoiskey_size_);
+            //         cudaMemcpyAsync(gk.host_location_[galois_.first].data(),
+            //                         galois_.second.data(),
+            //                         gk.galoiskey_size_ * sizeof(Data64),
+            //                         cudaMemcpyDeviceToHost);
+            //         HEONGPU_CUDA_CHECK(cudaGetLastError());
+            //     }
 
-    //         gk.zero_device_location_ =
-    //             std::vector<Data64>(gk.galoiskey_size_);
-    //         galoiskey_gen_II_kernel<<<dim3((n >> 8), Q_prime_size_, 1), 256, 0,
-    //                                   stream>>>(
-    //             gk.zero_device_location_.data(), sk.data(), error_poly, a_poly,
-    //             modulus_->data(), factor_->data(), gk.galois_elt_zero,
-    //             Sk_pair_->data(), n_power, Q_prime_size_, d_, Q_size_, P_size_);
-    //         HEONGPU_CUDA_CHECK(cudaGetLastError());
+            //     gk.zero_host_location_ = HostVector<Data64>(gk.galoiskey_size_);
+            //     cudaMemcpyAsync(gk.zero_host_location_.data(),
+            //                     gk.zero_device_location_.data(),
+            //                     gk.galoiskey_size_ * sizeof(Data64),
+            //                     cudaMemcpyDeviceToHost);
+            //     HEONGPU_CUDA_CHECK(cudaGetLastError());
 
-    //         if (gk.store_in_gpu_)
-    //         {
-    //             // pass
-    //         }
-    //         else
-    //         {
-    //             for (auto& galois_ : gk.device_location_)
-    //             {
-    //                 gk.host_location_[galois_.first] =
-    //                     HostVector<Data64>(gk.galoiskey_size_);
-    //                 cudaMemcpyAsync(gk.host_location_[galois_.first].data(),
-    //                                 galois_.second.data(),
-    //                                 gk.galoiskey_size_ * sizeof(Data64),
-    //                                 cudaMemcpyDeviceToHost);
-    //                 HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //             }
-
-    //             gk.zero_host_location_ = HostVector<Data64>(gk.galoiskey_size_);
-    //             cudaMemcpyAsync(gk.zero_host_location_.data(),
-    //                             gk.zero_device_location_.data(),
-    //                             gk.galoiskey_size_ * sizeof(Data64),
-    //                             cudaMemcpyDeviceToHost);
-    //             HEONGPU_CUDA_CHECK(cudaGetLastError());
-
-    //             gk.device_location_.clear();
-    //             gk.zero_device_location_.resize(0);
-    //         }
-    //     }
-    // }
+            //     gk.device_location_.clear();
+            //     gk.zero_device_location_.resize(0);
+            // }
+        }
+    }
 
     // void HEKeyGenerator::generate_ckks_galois_key_method_II(
     //     Galoiskey& gk, Secretkey& sk, const )

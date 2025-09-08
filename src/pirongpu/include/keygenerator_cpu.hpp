@@ -328,7 +328,7 @@ namespace heoncpu
                     }
                     else if (gk.scheme_ == scheme_type::ckks)
                     {
-                        generate_ckks_galois_key_method_II(gk, sk);
+                        // generate_ckks_galois_key_method_II(gk, sk);
                     }
                     else
                     {

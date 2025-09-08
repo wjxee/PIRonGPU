@@ -1,58 +1,3 @@
-/*
- * This file contains portions of code originally from the Microsoft SealPIR
- * project, which are licensed under the MIT License. The original code is
- * reproduced below with its original copyright:
- *
- * MIT License
- *
- * Copyright (c) Microsoft Corporation. All rights reserved.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
- * -----------------------------------------------------------------------------
- *
- * Modifications and additions by Alişah Özcan are licensed under the Apache
- * License, Version 2.0.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at:
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
- *
- * -----------------------------------------------------------------------------
- *
- * Original code is under the MIT License; modifications and additions are under
- * Apache-2.0.
- *
- * SPDX-License-Identifier: MIT OR Apache-2.0
- *
- * Developer: Alişah Özcan
- * Paper: https://eprint.iacr.org/2024/1543
- */
-
 #include "pir.cuh"
 #include "pir_cpu.hpp"
 #include "pir_client.cuh"
@@ -153,14 +98,18 @@ int main(int argc, char* argv[])
 
     std::cout << "Main: Generating galois keys for client" << std::endl;
     heongpu::Galoiskey galois_keys = client.generate_galois_keys();
+    //cpu
+    heoncpu::Galoiskey galois_keys_cpu = client_cpu.generate_galois_keys();
 
-
+    std::cout << "Initialization Phase Done." << std::endl;
 
     ////////////////////////////////
     int query_count = 4; // Total query count
     int num_thread = 4; // Each CPU thread corresponds a GPU Stream.
     assert(query_count >= num_thread);
     std::vector<PirReply> multi_reply(query_count);
+    //cpu
+    std::vector<heoncpu::PirReply> multi_reply_cpu(query_count);
     std::vector<cudaStream_t> streams;
     for (int i = 0; i < num_thread; i++)
     {
@@ -175,6 +124,11 @@ int main(int argc, char* argv[])
     std::vector<uint64_t> index;
     std::vector<uint64_t> offset;
     std::vector<PirQuery> query;
+    //cpu
+    std::vector<uint64_t> ele_index_cpu;
+    std::vector<uint64_t> index_cpu;
+    std::vector<uint64_t> offset_cpu;
+    std::vector<heoncpu::PirQuery> query_cpu;
     for (int i = 0; i < query_count; i++)
     {
         uint64_t inner_ele_index =
@@ -183,6 +137,11 @@ int main(int argc, char* argv[])
             client.get_fv_index(inner_ele_index); // index of FV plaintext
         uint64_t inner_offset =
             client.get_fv_offset(inner_ele_index); // offset in FV plaintext
+        //cpu
+        uint64_t inner_index_cpu =
+            client_cpu.get_fv_index(inner_ele_index); // index of FV plaintext
+        uint64_t inner_offset_cpu =
+            client_cpu.get_fv_offset(inner_ele_index); // offset in FV plaintext
 
         std::cout << "[" << (i + 1) << "/" << query_count
                   << "]: element index = " << inner_ele_index << " from [0, "
@@ -195,6 +154,8 @@ int main(int argc, char* argv[])
                   << ", FV offset = " << inner_offset << std::endl;
 
         PirQuery inner_query = client.generate_query(inner_index);
+        //cpu
+        heoncpu::PirQuery inner_query_cpu = client_cpu.generate_query(inner_index_cpu);
         std::cout << "[" << (i + 1) << "/" << query_count
                   << "]: query generated" << std::endl;
 
@@ -202,6 +163,11 @@ int main(int argc, char* argv[])
         index.push_back(inner_index);
         offset.push_back(inner_offset);
         query.push_back(inner_query);
+        //cpu
+        ele_index_cpu.push_back(inner_ele_index);
+        index_cpu.push_back(inner_index_cpu);
+        offset_cpu.push_back(inner_offset_cpu);
+        query_cpu.push_back(inner_query_cpu);
     }
 
     std::cout << "Main: Initializing server" << std::endl;

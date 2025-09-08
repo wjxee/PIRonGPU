@@ -16,6 +16,7 @@
 #include "encryptor_cpu.hpp"
 #include "decryptor_cpu.hpp"
 #include "operator_cpu.hpp"
+#include "keyswitch_cpu.hpp"
 
 
 

@@ -50,98 +50,96 @@ namespace heoncpu
          * encryption will be stored.
          * @param plaintext Plaintext object to be encrypted.
          */
-        // __host__ void
-        // encrypt(Ciphertext& ciphertext, Plaintext& plaintext,
-        //         const ExecutionOptions& options = ExecutionOptions())
-        // {
-        //     switch (static_cast<int>(scheme_))
-        //     {
-        //         case 1: // BFV
-        //             if (plaintext.size() < n)
-        //             {
-        //                 throw std::invalid_argument("Invalid plaintext size.");
-        //             }
+        void encrypt(Ciphertext& ciphertext, Plaintext& plaintext)
+        {
+            switch (static_cast<int>(scheme_))
+            {
+                case 1: // BFV
+                    if (plaintext.size() < n)
+                    {
+                        throw std::invalid_argument("Invalid plaintext size.");
+                    }
 
-        //             if (plaintext.depth() != 0)
-        //             {
-        //                 throw std::invalid_argument(
-        //                     "Invalid plaintext depth must be zero.");
-        //             }
+                    if (plaintext.depth() != 0)
+                    {
+                        throw std::invalid_argument(
+                            "Invalid plaintext depth must be zero.");
+                    }
 
-        //             input_storage_manager(
-        //                 plaintext,
-        //                 [&](Plaintext& plaintext_)
-        //                 {
-        //                     output_storage_manager(
-        //                         ciphertext,
-        //                         [&](Ciphertext& ciphertext_)
-        //                         {
-        //                             encrypt_bfv(ciphertext_, plaintext_,
-        //                                         options.stream_);
+                    // input_storage_manager(
+                    //     plaintext,
+                    //     [&](Plaintext& plaintext_)
+                    //     {
+                    //         output_storage_manager(
+                    //             ciphertext,
+                    //             [&](Ciphertext& ciphertext_)
+                    //             {
+                    //                 encrypt_bfv(ciphertext_, plaintext_,
+                    //                             options.stream_);
 
-        //                             ciphertext.scheme_ = scheme_;
-        //                             ciphertext.ring_size_ = n;
-        //                             ciphertext.coeff_modulus_count_ = Q_size_;
-        //                             ciphertext.cipher_size_ = 2;
-        //                             ciphertext.depth_ = 0;
-        //                             ciphertext.in_ntt_domain_ = false;
-        //                             ciphertext.scale_ = 0;
-        //                             ciphertext.rescale_required_ = false;
-        //                             ciphertext.relinearization_required_ =
-        //                                 false;
-        //                         },
-        //                         options);
-        //                 },
-        //                 options, false);
+                    //                 ciphertext.scheme_ = scheme_;
+                    //                 ciphertext.ring_size_ = n;
+                    //                 ciphertext.coeff_modulus_count_ = Q_size_;
+                    //                 ciphertext.cipher_size_ = 2;
+                    //                 ciphertext.depth_ = 0;
+                    //                 ciphertext.in_ntt_domain_ = false;
+                    //                 ciphertext.scale_ = 0;
+                    //                 ciphertext.rescale_required_ = false;
+                    //                 ciphertext.relinearization_required_ =
+                    //                     false;
+                    //             },
+                    //             options);
+                    //     },
+                    //     options, false);
+                    encrypt_bfv(ciphertext, plaintext);
+                    break;
+                case 2: // CKKS
+                    if (plaintext.size() < (n * Q_size_))
+                    {
+                        throw std::invalid_argument("Invalid plaintext size.");
+                    }
 
-        //             break;
-        //         case 2: // CKKS
-        //             if (plaintext.size() < (n * Q_size_))
-        //             {
-        //                 throw std::invalid_argument("Invalid plaintext size.");
-        //             }
+                    if (plaintext.depth() != 0)
+                    {
+                        throw std::invalid_argument(
+                            "Invalid plaintext depth must be zero.");
+                    }
 
-        //             if (plaintext.depth() != 0)
-        //             {
-        //                 throw std::invalid_argument(
-        //                     "Invalid plaintext depth must be zero.");
-        //             }
+                    // input_storage_manager(
+                    //     plaintext,
+                    //     [&](Plaintext& plaintext_)
+                    //     {
+                    //         output_storage_manager(
+                    //             ciphertext,
+                    //             [&](Ciphertext& ciphertext_)
+                    //             {
+                    //                 encrypt_ckks(ciphertext_, plaintext,
+                    //                              options.stream_);
 
-        //             input_storage_manager(
-        //                 plaintext,
-        //                 [&](Plaintext& plaintext_)
-        //                 {
-        //                     output_storage_manager(
-        //                         ciphertext,
-        //                         [&](Ciphertext& ciphertext_)
-        //                         {
-        //                             encrypt_ckks(ciphertext_, plaintext,
-        //                                          options.stream_);
+                    //                 ciphertext.scheme_ = scheme_;
+                    //                 ciphertext.ring_size_ = n;
+                    //                 ciphertext.coeff_modulus_count_ = Q_size_;
+                    //                 ciphertext.cipher_size_ = 2;
+                    //                 ciphertext.depth_ = 0;
+                    //                 ciphertext.in_ntt_domain_ = true;
+                    //                 ciphertext.scale_ = plaintext.scale_;
+                    //                 ciphertext.rescale_required_ = false;
+                    //                 ciphertext.relinearization_required_ =
+                    //                     false;
+                    //             },
+                    //             options);
+                    //     },
+                    //     options, false);
 
-        //                             ciphertext.scheme_ = scheme_;
-        //                             ciphertext.ring_size_ = n;
-        //                             ciphertext.coeff_modulus_count_ = Q_size_;
-        //                             ciphertext.cipher_size_ = 2;
-        //                             ciphertext.depth_ = 0;
-        //                             ciphertext.in_ntt_domain_ = true;
-        //                             ciphertext.scale_ = plaintext.scale_;
-        //                             ciphertext.rescale_required_ = false;
-        //                             ciphertext.relinearization_required_ =
-        //                                 false;
-        //                         },
-        //                         options);
-        //                 },
-        //                 options, false);
+                    break;
+                case 3: // BGV
 
-        //             break;
-        //         case 3: // BGV
-
-        //             break;
-        //         default:
-        //             throw std::invalid_argument("Invalid Scheme Type");
-        //             break;
-        //     }
-        // }
+                    break;
+                default:
+                    throw std::invalid_argument("Invalid Scheme Type");
+                    break;
+            }
+        }
 
         /**
          * @brief Returns the seed of the encryptor.
@@ -173,9 +171,8 @@ namespace heoncpu
         HEEncryptor& operator=(const HEEncryptor& assign) = default;
         HEEncryptor& operator=(HEEncryptor&& assign) = default;
 
-    //   private:
-    //     __host__ void encrypt_bfv(Ciphertext& ciphertext, Plaintext& plaintext,
-    //                               const cudaStream_t stream);
+      private:
+        void encrypt_bfv(Ciphertext& ciphertext, Plaintext& plaintext );
 
     //     __host__ void encrypt_ckks(Ciphertext& ciphertext, Plaintext& plaintext,
     //                                const cudaStream_t stream);

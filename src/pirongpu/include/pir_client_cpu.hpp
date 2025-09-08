@@ -11,7 +11,7 @@ namespace heoncpu
         PIRClient(std::shared_ptr<Parameters>& context,
                   const PirParams& pirparams);
 
-        // Galoiskey generate_galois_keys();
+        Galoiskey generate_galois_keys();
 
         uint64_t get_fv_index(uint64_t element_index);
         uint64_t get_fv_offset(uint64_t element_index);

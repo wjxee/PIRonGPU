@@ -33,86 +33,86 @@ namespace heoncpu
                                                                      *encoder_);
     }
 
-    // Galoiskey PIRClient::generate_galois_keys()
-    // {
-    //     std::vector<uint32_t> galois_elts;
-    //     int N = context_->poly_modulus_degree();
-    //     int logN = context_->log_poly_modulus_degree();
+    Galoiskey PIRClient::generate_galois_keys()
+    {
+        std::vector<uint32_t> galois_elts;
+        int N = context_->poly_modulus_degree();
+        int logN = context_->log_poly_modulus_degree();
 
-    //     for (int i = 0; i < logN; i++)
-    //     {
-    //         galois_elts.push_back((N + int(pow(2, i))) / int(pow(2, i)));
-    //     }
-    //     Galoiskey galois_key(*context_, galois_elts);
-    //     keygen_->generate_galois_key(galois_key, *secret_key_);
-    //     return galois_key;
-    // }
+        for (int i = 0; i < logN; i++)
+        {
+            galois_elts.push_back((N + int(pow(2, i))) / int(pow(2, i)));
+        }
+        Galoiskey galois_key(*context_, galois_elts);
+        keygen_->generate_galois_key(galois_key, *secret_key_);
+        return galois_key;
+    }
 
-    // uint64_t PIRClient::get_fv_index(uint64_t element_index)
-    // {
-    //     return static_cast<uint64_t>(element_index /
-    //                                  pir_params_.elements_per_plaintext);
-    // }
+    uint64_t PIRClient::get_fv_index(uint64_t element_index)
+    {
+        return static_cast<uint64_t>(element_index /
+                                     pir_params_.elements_per_plaintext);
+    }
 
-    // uint64_t PIRClient::get_fv_offset(uint64_t element_index)
-    // {
-    //     return element_index % pir_params_.elements_per_plaintext;
-    // }
+    uint64_t PIRClient::get_fv_offset(uint64_t element_index)
+    {
+        return element_index % pir_params_.elements_per_plaintext;
+    }
 
-    // PirQuery PIRClient::generate_query(uint64_t desiredIndex)
-    // {
-    //     indices_ = compute_indices(desiredIndex, pir_params_.nvec);
-    //     PirQuery result(pir_params_.d);
+    PirQuery PIRClient::generate_query(uint64_t desiredIndex)
+    {
+        indices_ = compute_indices(desiredIndex, pir_params_.nvec);
+        PirQuery result(pir_params_.d);
 
-    //     int N = context_->poly_modulus_degree();
-    //     Modulus64 plain_modulus = context_->plain_modulus();
-    //     for (uint32_t i = 0; i < indices_.size(); i++)
-    //     {
-    //         uint32_t num_ptxts = ceil((pir_params_.nvec[i] + 0.0) / N);
-    //         // initialize result.
-    //         std::cout << "Client: index " << i + 1 << "/ " << indices_.size()
-    //                   << " = " << indices_[i] << std::endl;
-    //         std::cout << "Client: number of ctxts needed for query = "
-    //                   << num_ptxts << std::endl;
+        int N = context_->poly_modulus_degree();
+        Modulus64 plain_modulus = context_->plain_modulus();
+        for (uint32_t i = 0; i < indices_.size(); i++)
+        {
+            uint32_t num_ptxts = ceil((pir_params_.nvec[i] + 0.0) / N);
+            // initialize result.
+            std::cout << "Client: index " << i + 1 << "/ " << indices_.size()
+                      << " = " << indices_[i] << std::endl;
+            std::cout << "Client: number of ctxts needed for query = "
+                      << num_ptxts << std::endl;
 
-    //         for (uint32_t j = 0; j < num_ptxts; j++)
-    //         {
-    //             std::vector<Data64> pt_vector(N, 0ULL);
-    //             if (indices_[i] >= N * j && indices_[i] <= N * (j + 1))
-    //             {
-    //                 uint64_t real_index = indices_[i] - N * j;
-    //                 uint64_t n_i = pir_params_.nvec[i];
-    //                 uint64_t total = N;
-    //                 if (j == num_ptxts - 1)
-    //                 {
-    //                     total = n_i % N;
-    //                 }
-    //                 uint64_t log_total = ceil(log2(total));
-    //                 std::cout << "Client: Inverting " << pow(2, log_total)
-    //                           << std::endl;
+            for (uint32_t j = 0; j < num_ptxts; j++)
+            {
+                std::vector<Data64> pt_vector(N, 0ULL);
+                if (indices_[i] >= N * j && indices_[i] <= N * (j + 1))
+                {
+                    uint64_t real_index = indices_[i] - N * j;
+                    uint64_t n_i = pir_params_.nvec[i];
+                    uint64_t total = N;
+                    if (j == num_ptxts - 1)
+                    {
+                        total = n_i % N;
+                    }
+                    uint64_t log_total = ceil(log2(total));
+                    std::cout << "Client: Inverting " << pow(2, log_total)
+                              << std::endl;
 
-    //                 Data64 pow_ = pow(2, log_total);
-    //                 pt_vector[real_index] =
-    //                     OPERATOR64::modinv(pow_, plain_modulus);
-    //             }
-    //             Plaintext pt(pt_vector, *context_);
-    //             Ciphertext dest(*context_);
+                    Data64 pow_ = pow(2, log_total);
+                    pt_vector[real_index] =
+                        OPERATOR64::modinv(pow_, plain_modulus);
+                }
+                Plaintext pt(pt_vector, *context_);
+                Ciphertext dest(*context_);
 
-    //             if (pir_params_.enable_symmetric)
-    //             {
-    //                 throw std::invalid_argument(
-    //                     "Symmetric Encryption is not supported!");
-    //             }
-    //             else
-    //             {
-    //                 encryptor_->encrypt(dest, pt);
-    //             }
-    //             result[i].push_back(dest);
-    //         }
-    //     }
+                if (pir_params_.enable_symmetric)
+                {
+                    throw std::invalid_argument(
+                        "Symmetric Encryption is not supported!");
+                }
+                else
+                {
+                    encryptor_->encrypt(dest, pt);
+                }
+                result[i].push_back(dest);
+            }
+        }
 
-    //     return result;
-    // }
+        return result;
+    }
 
     // std::vector<uint8_t> PIRClient::extract_bytes(Plaintext& pt,
     //                                               uint64_t offset)

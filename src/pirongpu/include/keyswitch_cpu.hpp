@@ -480,8 +480,8 @@ namespace heoncpu
          * @param store_in_gpu A boolean value indicating whether to store the
          * key in GPU memory. Default is true.
          */
-        Galoiskey(Parameters& context, std::vector<int>& shift_vec,
-                           bool store_in_gpu = true);
+        // Galoiskey(Parameters& context, std::vector<int>& shift_vec,
+        //                    bool store_in_gpu = true);
 
         /**
          * @brief Constructs a new Galoiskey object allowing certain Galois
@@ -495,8 +495,7 @@ namespace heoncpu
          * key in GPU memory. Default is true.
          */
         Galoiskey(Parameters& context,
-                           std::vector<uint32_t>& galois_elts,
-                           bool store_in_gpu = true);
+                           std::vector<uint32_t>& galois_elts);
 
         /**
          * @brief Stores the galois key in the device (GPU) memory.
@@ -511,7 +510,7 @@ namespace heoncpu
         /**
          * @brief Checks whether the data is stored on the device (GPU) memory.
          */
-        bool is_on_device() const { return store_in_gpu_; }
+        // bool is_on_device() const { return store_in_gpu_; }
 
         /**
          * @brief Returns a pointer to the specified part of the Galois key
@@ -554,7 +553,7 @@ namespace heoncpu
               Q_size_(copy.Q_size_), d_(copy.d_), d_tilda_(copy.d_tilda_),
               r_prime_(copy.r_prime_), customized(copy.customized),
               group_order_(copy.group_order_),
-              store_in_gpu_(copy.store_in_gpu_),
+            //   store_in_gpu_(copy.store_in_gpu_),
               galoiskey_size_(copy.galoiskey_size_),
               custom_galois_elt(copy.custom_galois_elt),
               galois_elt(copy.galois_elt), galois_elt_zero(copy.galois_elt_zero)
@@ -613,24 +612,24 @@ namespace heoncpu
               r_prime_(std::move(assign.r_prime_)),
               customized(std::move(assign.customized)),
               group_order_(std::move(assign.group_order_)),
-              store_in_gpu_(std::move(assign.store_in_gpu_)),
+            //   store_in_gpu_(std::move(assign.store_in_gpu_)),
               galoiskey_size_(std::move(assign.galoiskey_size_)),
               custom_galois_elt(std::move(assign.custom_galois_elt)),
               galois_elt(std::move(assign.galois_elt)),
               galois_elt_zero(std::move(assign.galois_elt_zero))
         {
-            if (assign.store_in_gpu_)
-            {
-                for (const auto& [key, value] : assign.device_location_)
-                {
-                    device_location_[key] = std::move(value);
-                }
+            // if (assign.store_in_gpu_)
+            // {
+            //     for (const auto& [key, value] : assign.device_location_)
+            //     {
+            //         device_location_[key] = std::move(value);
+            //     }
 
-                assign.device_location_.clear();
+            //     assign.device_location_.clear();
 
-                zero_device_location_ = std::move(assign.zero_device_location_);
-            }
-            else
+            //     zero_device_location_ = std::move(assign.zero_device_location_);
+            // }
+            // else
             {
                 for (const auto& [key, value] : assign.host_location_)
                 {
@@ -668,7 +667,7 @@ namespace heoncpu
                 r_prime_ = copy.r_prime_;
                 customized = copy.customized;
                 group_order_ = copy.group_order_;
-                store_in_gpu_ = copy.store_in_gpu_;
+                // store_in_gpu_ = copy.store_in_gpu_;
                 galoiskey_size_ = copy.galoiskey_size_;
                 custom_galois_elt = copy.custom_galois_elt;
                 galois_elt = copy.galois_elt;
@@ -737,25 +736,25 @@ namespace heoncpu
                 r_prime_ = std::move(assign.r_prime_);
                 customized = std::move(assign.customized);
                 group_order_ = std::move(assign.group_order_);
-                store_in_gpu_ = std::move(assign.store_in_gpu_);
+                // store_in_gpu_ = std::move(assign.store_in_gpu_);
                 galoiskey_size_ = std::move(assign.galoiskey_size_);
                 custom_galois_elt = std::move(assign.custom_galois_elt);
                 galois_elt = std::move(assign.galois_elt);
                 galois_elt_zero = std::move(assign.galois_elt_zero);
 
-                if (assign.store_in_gpu_)
-                {
-                    for (const auto& [key, value] : assign.device_location_)
-                    {
-                        device_location_[key] = std::move(value);
-                    }
+                // if (assign.store_in_gpu_)
+                // {
+                //     for (const auto& [key, value] : assign.device_location_)
+                //     {
+                //         device_location_[key] = std::move(value);
+                //     }
 
-                    assign.device_location_.clear();
+                //     assign.device_location_.clear();
 
-                    zero_device_location_ =
-                        std::move(assign.zero_device_location_);
-                }
-                else
+                //     zero_device_location_ =
+                //         std::move(assign.zero_device_location_);
+                // }
+                // else
                 {
                     for (const auto& [key, value] : assign.host_location_)
                     {
@@ -786,18 +785,18 @@ namespace heoncpu
         bool customized;
         int group_order_;
 
-        bool store_in_gpu_;
+        // bool store_in_gpu_;
         size_t galoiskey_size_;
         std::vector<u_int32_t> custom_galois_elt;
 
         // for rotate_rows
         std::unordered_map<int, int> galois_elt;
-        std::unordered_map<int, std::vector<Data64>> device_location_;
+        // std::unordered_map<int, std::vector<Data64>> device_location_;
         std::unordered_map<int, std::vector<Data64>> host_location_;
 
         // for rotate_columns
         int galois_elt_zero;
-        std::vector<Data64> zero_device_location_;
+        // std::vector<Data64> zero_device_location_;
         std::vector<Data64> zero_host_location_;
     };
 
@@ -878,7 +877,7 @@ namespace heoncpu
         /**
          * @brief Checks whether the data is stored on the device (GPU) memory.
          */
-        bool is_on_device() const { return store_in_gpu_; }
+        // bool is_on_device() const { return store_in_gpu_; }
 
         /**
          * @brief Returns a pointer to the underlying switch key data.
@@ -906,10 +905,10 @@ namespace heoncpu
         int d_tilda_;
         int r_prime_;
 
-        bool store_in_gpu_;
+        // bool store_in_gpu_;
         size_t switchkey_size_;
 
-        std::vector<Data64> device_location_;
+        // std::vector<Data64> device_location_;
         std::vector<Data64> host_location_;
     };
 

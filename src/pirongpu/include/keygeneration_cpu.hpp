@@ -91,12 +91,17 @@ namespace heoncpu
 
     // // Galois Key Generation
 
-    // int steps_to_galois_elt(int steps, int coeff_count, int group_order);
+    int steps_to_galois_elt(int steps, int coeff_count, int group_order);
 
     // __device__ int bitreverse_gpu(int index, int n_power);
 
-    // __device__ int permutation(int index, int galois_elt, int coeff_count,
-    //                            int n_power);
+    int permutation(int index, int galois_elt, int coeff_count,
+                               int n_power);
+
+    void galoiskey_gen_cpu(
+        Data64* galois_key, Data64* secret_key, Data64* error_poly, Data64* a_poly,
+        Modulus64* modulus, Data64* factor, int galois_elt, int n_power, int rns_mod_count,
+        int grid_x, int grid_y, int grid_z, int block_size);
 
     // __global__ void galoiskey_gen_kernel(Data64* galois_key, Data64* secret_key,
     //                                      Data64* error_poly, Data64* a_poly,
@@ -108,7 +113,11 @@ namespace heoncpu
     //     Data64* galois_key_temp, Data64* secret_key, Data64* error_poly,
     //     Data64* a_poly, Modulus64* modulus, Data64* factor, int galois_elt,
     //     int* Sk_pair, int n_power, int l_tilda, int d, int Q_size, int P_size);
-
+    void galoiskey_gen_II_cpu(
+            Data64* galois_key_temp, Data64* secret_key, Data64* error_poly, Data64* a_poly,
+            Modulus64* modulus, Data64* factor, int galois_elt, int* Sk_pair, int n_power,
+            int l_tilda, int d, int Q_size, int P_size,
+            int grid_x, int grid_y, int grid_z, int block_size);
     // __global__ void multi_party_galoiskey_gen_method_I_II_kernel(
     //     Data64* gk_1, Data64* gk_2, Modulus64* modulus, int n_power,
     //     int rns_mod_count, int decomp_mod_count, bool first);
