@@ -1540,7 +1540,7 @@ namespace heoncpu
             //     gk.zero_device_location_.resize(0);
             // }
         }
-        else
+        else //here
         {
             for (auto& galois_ : gk.custom_galois_elt)
             {
@@ -1578,7 +1578,9 @@ namespace heoncpu
                                 modulus_->data(), cfg_ntt,
                                 Q_size_ * Q_prime_size_, Q_prime_size_);
                 // HEONGPU_CUDA_CHECK(cudaGetLastError());
-
+                for(int i=0;i<20;i++){
+                    std::cout << i<<":"<< error_poly[i]<<";" <<std::endl;
+                }
                 int inv_galois = modInverse(galois_, 2 * n);
 
                 gk.host_location_[galois_] =

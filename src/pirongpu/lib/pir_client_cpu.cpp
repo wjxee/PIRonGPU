@@ -43,6 +43,12 @@ namespace heoncpu
         {
             galois_elts.push_back((N + int(pow(2, i))) / int(pow(2, i)));
         }
+        // std::cout << "gk:";
+        // for (int i = 0; i < logN; i++)
+        // {
+        //     std::cout << galois_elts[i] <<";";
+        // }
+        // std::cout << ";" << std::endl;
         Galoiskey galois_key(*context_, galois_elts);
         keygen_->generate_galois_key(galois_key, *secret_key_);
         return galois_key;

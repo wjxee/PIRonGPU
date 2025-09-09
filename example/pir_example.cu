@@ -134,6 +134,30 @@ int main(int argc, char* argv[])
     heoncpu::Galoiskey galois_keys_cpu = client_cpu.generate_galois_keys();
     //test consistence
     {
+        // int checkflag=0;
+        // int gsize = galois_keys_cpu.custom_galois_elt.size();
+        // std::vector<u_int32_t> gk_gpu(gsize);
+        //     cudaMemcpy(gk_gpu.data(), galois_keys.custom_galois_elt.data(),
+        //      gsize * sizeof(u_int32_t), cudaMemcpyDeviceToHost);
+        // for (int i=0;i<gsize;i++){
+        //     // int first_ele = pair.first;
+        //     // std::vector<Data64> second_ele = pair.second;
+        //     // int gk_size = second_ele.size();
+        //     // std::vector<Data64> gk_gpu(gk_size);
+        //     // cudaMemcpy(gk_gpu.data(), galois_keys.device_location_.at(first_ele).data(), gk_size * sizeof(Data64), cudaMemcpyDeviceToHost);
+        //     // for(int i=0;i<gk_size;i++){
+        //         if(gk_gpu[i]!=galois_keys_cpu.custom_galois_elt[i]){
+                    
+        //             checkflag+=1;
+        //         } 
+        //         std::cout << i << ":" << gk_gpu[i] << "==" <<  galois_keys_cpu.custom_galois_elt[i] <<";";
+        //     // }
+        // } 
+        // if (checkflag!=0)
+        //     std::cout << "gk wrong " << checkflag << std::endl;
+        // else   
+        //     std::cout << "gk all correct " << checkflag << std::endl;
+            
         int checkflag=0;
         for (auto& pair: galois_keys_cpu.host_location_){
             int first_ele = pair.first;
@@ -143,6 +167,7 @@ int main(int argc, char* argv[])
             cudaMemcpy(gk_gpu.data(), galois_keys.device_location_.at(first_ele).data(), gk_size * sizeof(Data64), cudaMemcpyDeviceToHost);
             for(int i=0;i<gk_size;i++){
                 if(gk_gpu[i]!=second_ele[i]){
+                    std::cout << i << ":" << gk_gpu[i] << "==" <<  second_ele[i] <<";" <<std::endl;
                     checkflag+=1;
                 } 
             }

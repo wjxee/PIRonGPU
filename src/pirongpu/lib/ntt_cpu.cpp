@@ -193,18 +193,18 @@ namespace heoncpu
         V = OPERATOR<T>::sub(u_, v_, modulus);
     }
 
-//     template <typename T>
-//     __device__ void GentlemanSandeUnit(T& U, T& V, const Root<T>& root,
-//                                        const Modulus<T>& modulus)
-//     {
-//         T u_ = U;
-//         T v_ = V;
+    template <typename T>
+    void GentlemanSandeUnit(T& U, T& V, const Root<T>& root,
+                                       const Modulus<T>& modulus)
+    {
+        T u_ = U;
+        T v_ = V;
 
-//         U = OPERATOR_GPU<T>::add(u_, v_, modulus);
+        U = OPERATOR<T>::add(u_, v_, modulus);
 
-//         v_ = OPERATOR_GPU<T>::sub(u_, v_, modulus);
-//         V = OPERATOR_GPU<T>::mult(v_, root, modulus);
-//     }
+        v_ = OPERATOR<T>::sub(u_, v_, modulus);
+        V = OPERATOR<T>::mult(v_, root, modulus);
+    }
 
 //     template <typename T>
 //     __global__ void
@@ -1069,179 +1069,128 @@ namespace heoncpu
 //     }
 
     template <typename T>
-    void ForwardCore(KernelConfig current_kernel_params, int batch_size,
-        T* polynomial_in, typename std::make_unsigned<T>::type* polynomial_out,
-        const Root<typename std::make_unsigned<T>::type>* root_of_unity_table,
-        Modulus<typename std::make_unsigned<T>::type>* modulus,
-        int shared_index, int logm, int outer_iteration_count,
-        int N_power, bool zero_padding, bool not_last_kernel,
-        bool reduction_poly_check, int mod_count)
-    {
-        using TU = typename std::make_unsigned<T>::type;
+    void ForwardCoreCPU(T* polynomial_in, T* polynomial_out,
+                    const Root<T>* root_of_unity_table,
+                    Modulus<T>* modulus, int shared_index, int logm,
+                    int outer_iteration_count, int N_power,
+                    bool zero_padding, bool not_last_kernel,
+                    bool reduction_poly_check, int mod_count,
+                    int griddim_x, int griddim_y, int batch_size,
+                    int blockdim_x, int blockdim_y) {
         
-        // 获取当前内核参数（模拟CUDA网格和块配置）
-        int griddim_x = current_kernel_params.griddim_x; // 估计值，需要根据实际情况调整
-        int griddim_y = current_kernel_params.griddim_y; // 估计值
-        int blockdim_x = current_kernel_params.blockdim_x; // 估计值
-        int blockdim_y = current_kernel_params.blockdim_y; // 估计值
-        
-        
-        // 遍历所有批次和块
-        for (int block_z = 0; block_z < batch_size; block_z++)
-        {
-            for (int block_y = 0; block_y < griddim_y; block_y++)
-            {
-                for (int block_x = 0; block_x < griddim_x; block_x++)
-                {
-                    int mod_index = block_z % mod_count;
-                    const Modulus<TU> modulus_reg = modulus[mod_index];
+        // 遍历所有网格和块
+        for (int block_z = 0; block_z < batch_size; block_z++) {
+            for (int block_y = 0; block_y < griddim_y; block_y++) {
+                for (int block_x = 0; block_x < griddim_x; block_x++) {
                     
-                    // 分配本地内存（模拟共享内存）
-                    std::vector<TU> shared_memory(2 * blockdim_x * blockdim_y);
+                    // 计算共享内存大小（以T为单位）
+                    int shared_memory_size = blockdim_x * blockdim_y * 2;
+                    std::vector<T> shared_memory(shared_memory_size);
                     
-                    // 遍历所有线程
-                    for (int idx_y = 0; idx_y < blockdim_y; idx_y++)
-                    {
-                        for (int idx_x = 0; idx_x < blockdim_x; idx_x++)
-                        {
-                            // 计算全局地址
-                            location_t offset = 1 << (N_power - logm - 1);
-                            location_t global_address = 
+                    const int mod_index = block_z % mod_count;
+                    
+                    int t_2 = N_power - logm - 1;
+                    location_t offset = 1 << (N_power - logm - 1);
+                    int t_ = shared_index;
+                    location_t m = (location_t) 1 << logm;
+                    
+                    // 处理所有线程
+                    for (int idx_y = 0; idx_y < blockdim_y; idx_y++) {
+                        for (int idx_x = 0; idx_x < blockdim_x; idx_x++) {
+                            location_t global_addresss =
                                 idx_x +
-                                (idx_y * (offset / (1 << (outer_iteration_count - 1)))) +
-                                (blockdim_x * block_x) +
-                                (2 * block_y * offset) +
-                                (block_z << N_power);
+                                (location_t) (idx_y * (offset / (1 << (outer_iteration_count - 1)))) +
+                                (location_t) (blockdim_x * block_x) +
+                                (location_t) (2 * block_y * offset) + (location_t) (block_z << N_power);
                             
-                            // 计算共享内存地址
-                            location_t shared_address = (idx_x + (idx_y * blockdim_x));
-                            
-                            // 加载数据到本地内存
-                            if constexpr (std::is_signed<T>::value)
-                            {
-                                T input1_reg = polynomial_in[global_address];
-                                T input2_reg = polynomial_in[global_address + offset];
-                                shared_memory[shared_address] = 
-                                    OPERATOR<TU>::reduce(input1_reg, modulus_reg);
-                                shared_memory[shared_address + (blockdim_x * blockdim_y)] = 
-                                    OPERATOR<TU>::reduce(input2_reg, modulus_reg);
-                            }
-                            else
-                            {
-                                shared_memory[shared_address] = polynomial_in[global_address];
-                                shared_memory[shared_address + (blockdim_x * blockdim_y)] = 
-                                    polynomial_in[global_address + offset];
-                            }
-                            
-                            // 初始化变量
-                            int t_2 = N_power - logm - 1;
-                            int t_ = shared_index;
-                            location_t m = (location_t) 1 << logm;
-                            
-                            // 计算omega地址
-                            location_t omega_address = 
+                            location_t omega_addresss =
                                 idx_x +
-                                (idx_y * (offset / (1 << (outer_iteration_count - 1)))) +
-                                (blockdim_x * block_x) +
-                                (block_y * offset);
+                                (location_t) (idx_y * (offset / (1 << (outer_iteration_count - 1)))) +
+                                (location_t) (blockdim_x * block_x) + (location_t) (block_y * offset);
                             
-                            // 计算共享内存中的内部地址
+                            location_t shared_addresss = (idx_x + (idx_y * blockdim_x));
+                            
+                            // 从全局内存加载数据到共享内存
+                            shared_memory[shared_addresss] = polynomial_in[global_addresss];
+                            shared_memory[shared_addresss + (blockdim_x * blockdim_y)] =
+                                polynomial_in[global_addresss + offset];
+                            
                             int t = 1 << t_;
-                            int in_shared_address = ((shared_address >> t_) << t_) + shared_address;
+                            int in_shared_address = ((shared_addresss >> t_) << t_) + shared_addresss;
+                            location_t current_root_index;
                             
-                            // 执行蝴蝶操作
-                            if (not_last_kernel)
-                            {
-                                for (int lp = 0; lp < outer_iteration_count; lp++)
-                                {
-                                    location_t current_root_index;
-                                    if (reduction_poly_check)
-                                    { // X_N_minus
-                                        current_root_index = (omega_address >> t_2) + (mod_index << N_power);
-                                    }
-                                    else
-                                    { // X_N_plus
-                                        current_root_index = m + (omega_address >> t_2) + (mod_index << N_power);
+                            if (not_last_kernel) {
+                                for (int lp = 0; lp < outer_iteration_count; lp++) {
+                                    if (reduction_poly_check) { // X_N_minus
+                                        current_root_index = (omega_addresss >> t_2) +
+                                                            (location_t) (mod_index << N_power);
+                                    } else { // X_N_plus
+                                        current_root_index = m + (omega_addresss >> t_2) +
+                                                            (location_t) (mod_index << N_power);
                                     }
                                     
-                                    CooleyTukeyUnit(
-                                        shared_memory[in_shared_address],
-                                        shared_memory[in_shared_address + t],
-                                        root_of_unity_table[current_root_index],
-                                        modulus_reg);
+                                    CooleyTukeyUnit(shared_memory[in_shared_address],
+                                                    shared_memory[in_shared_address + t],
+                                                    root_of_unity_table[current_root_index],
+                                                    modulus[mod_index]);
                                     
-                                    // 更新变量
                                     t = t >> 1;
                                     t_2 -= 1;
                                     t_ -= 1;
                                     m <<= 1;
                                     
-                                    in_shared_address = ((shared_address >> t_) << t_) + shared_address;
+                                    in_shared_address = ((shared_addresss >> t_) << t_) + shared_addresss;
                                 }
-                            }
-                            else
-                            {
-                                // 第一部分循环
-                                for (int lp = 0; lp < (shared_index - 5); lp++)
-                                {
-                                    location_t current_root_index;
-                                    if (reduction_poly_check)
-                                    { // X_N_minus
-                                        current_root_index = (omega_address >> t_2) + (mod_index << N_power);
-                                    }
-                                    else
-                                    { // X_N_plus
-                                        current_root_index = m + (omega_address >> t_2) + (mod_index << N_power);
+                            } else {
+                                for (int lp = 0; lp < (shared_index - 5); lp++) { // 4 for 512 thread
+                                    if (reduction_poly_check) { // X_N_minus
+                                        current_root_index = (omega_addresss >> t_2) +
+                                                            (location_t) (mod_index << N_power);
+                                    } else { // X_N_plus
+                                        current_root_index = m + (omega_addresss >> t_2) +
+                                                            (location_t) (mod_index << N_power);
                                     }
                                     
-                                    CooleyTukeyUnit(
-                                        shared_memory[in_shared_address],
-                                        shared_memory[in_shared_address + t],
-                                        root_of_unity_table[current_root_index],
-                                        modulus_reg);
+                                    CooleyTukeyUnit(shared_memory[in_shared_address],
+                                                    shared_memory[in_shared_address + t],
+                                                    root_of_unity_table[current_root_index],
+                                                    modulus[mod_index]);
                                     
-                                    // 更新变量
                                     t = t >> 1;
                                     t_2 -= 1;
                                     t_ -= 1;
                                     m <<= 1;
                                     
-                                    in_shared_address = ((shared_address >> t_) << t_) + shared_address;
+                                    in_shared_address = ((shared_addresss >> t_) << t_) + shared_addresss;
                                 }
                                 
-                                // 第二部分循环
-                                for (int lp = 0; lp < 6; lp++)
-                                {
-                                    location_t current_root_index;
-                                    if (reduction_poly_check)
-                                    { // X_N_minus
-                                        current_root_index = (omega_address >> t_2) + (mod_index << N_power);
-                                    }
-                                    else
-                                    { // X_N_plus
-                                        current_root_index = m + (omega_address >> t_2) + (mod_index << N_power);
+                                for (int lp = 0; lp < 6; lp++) {
+                                    if (reduction_poly_check) { // X_N_minus
+                                        current_root_index = (omega_addresss >> t_2) +
+                                                            (location_t) (mod_index << N_power);
+                                    } else { // X_N_plus
+                                        current_root_index = m + (omega_addresss >> t_2) +
+                                                            (location_t) (mod_index << N_power);
                                     }
                                     
-                                    CooleyTukeyUnit(
-                                        shared_memory[in_shared_address],
-                                        shared_memory[in_shared_address + t],
-                                        root_of_unity_table[current_root_index],
-                                        modulus_reg);
+                                    CooleyTukeyUnit(shared_memory[in_shared_address],
+                                                    shared_memory[in_shared_address + t],
+                                                    root_of_unity_table[current_root_index],
+                                                    modulus[mod_index]);
                                     
-                                    // 更新变量
                                     t = t >> 1;
                                     t_2 -= 1;
                                     t_ -= 1;
                                     m <<= 1;
                                     
-                                    in_shared_address = ((shared_address >> t_) << t_) + shared_address;
+                                    in_shared_address = ((shared_addresss >> t_) << t_) + shared_addresss;
                                 }
                             }
                             
-                            // 将结果写回输出
-                            polynomial_out[global_address] = shared_memory[shared_address];
-                            polynomial_out[global_address + offset] = 
-                                shared_memory[shared_address + (blockdim_x * blockdim_y)];
+                            // 将结果写回全局内存
+                            polynomial_out[global_addresss] = shared_memory[shared_addresss];
+                            polynomial_out[global_addresss + offset] =
+                                shared_memory[shared_addresss + (blockdim_x * blockdim_y)];
                         }
                     }
                 }
@@ -1572,178 +1521,130 @@ namespace heoncpu
 //     }
 
     template <typename T>
-    void ForwardCore_(KernelConfig current_kernel_params, int batch_size,
-        T* polynomial_in, typename std::make_unsigned<T>::type* polynomial_out,
-        const Root<typename std::make_unsigned<T>::type>* root_of_unity_table,
-        Modulus<typename std::make_unsigned<T>::type>* modulus,
-        int shared_index, int logm, int outer_iteration_count,
-        int N_power, bool zero_padding, bool not_last_kernel,
-        bool reduction_poly_check, int mod_count)
-    {
-        using TU = typename std::make_unsigned<T>::type;
+    void ForwardCore_CPU(T* polynomial_in, T* polynomial_out,
+                        const Root<T>* root_of_unity_table,
+                        Modulus<T>* modulus, int shared_index, int logm,
+                        int outer_iteration_count, int N_power,
+                        bool zero_padding, bool not_last_kernel,
+                        bool reduction_poly_check, int mod_count,
+                        int griddim_x, int griddim_y, int batch_size,
+                        int blockdim_x, int blockdim_y) {
         
-        // 获取当前内核参数（模拟CUDA网格和块配置）
-        int griddim_x = current_kernel_params.griddim_x;
-        int griddim_y = current_kernel_params.griddim_y;
-        int blockdim_x = current_kernel_params.blockdim_x;
-        int blockdim_y = current_kernel_params.blockdim_y; 
+        // 计算共享内存大小（以T为单位）
+        int shared_memory_size = blockdim_x * blockdim_y * 2;
         
-        // 遍历所有批次和块
-        for (int block_z = 0; block_z < batch_size; block_z++)
-        {
-            for (int block_y = 0; block_y < griddim_y; block_y++)
-            {
-                for (int block_x = 0; block_x < griddim_x; block_x++)
-                {
-                    int mod_index = block_z % mod_count;
-                    const Modulus<TU> modulus_reg = modulus[mod_index];
+        // 遍历所有网格和块
+        for (int block_z = 0; block_z < batch_size; block_z++) {
+            for (int block_y = 0; block_y < griddim_y; block_y++) {
+                for (int block_x = 0; block_x < griddim_x; block_x++) {
                     
-                    // 分配本地内存（模拟共享内存）
-                    std::vector<TU> shared_memory(2 * blockdim_x * blockdim_y);
+                    // 分配共享内存
+                    std::vector<T> shared_memory(shared_memory_size);
                     
-                    // 遍历所有线程
-                    for (int idx_y = 0; idx_y < blockdim_y; idx_y++)
-                    {
-                        for (int idx_x = 0; idx_x < blockdim_x; idx_x++)
-                        {
-                            // 计算全局地址（注意：与ForwardCore的区别在于block_x和block_y的角色交换）
-                            location_t offset = 1 << (N_power - logm - 1);
-                            location_t global_address = 
+                    const int mod_index = block_z % mod_count;
+                    
+                    int t_2 = N_power - logm - 1;
+                    location_t offset = 1 << (N_power - logm - 1);
+                    int t_ = shared_index;
+                    location_t m = (location_t) 1 << logm;
+                    
+                    // 处理所有线程
+                    for (int idx_y = 0; idx_y < blockdim_y; idx_y++) {
+                        for (int idx_x = 0; idx_x < blockdim_x; idx_x++) {
+                            location_t global_addresss =
                                 idx_x +
-                                (idx_y * (offset / (1 << (outer_iteration_count - 1)))) +
-                                (blockdim_x * block_y) +  // 注意：这里是block_y而不是block_x
-                                (2 * block_x * offset) +  // 注意：这里是block_x而不是block_y
-                                (block_z << N_power);
+                                (location_t) (idx_y * (offset / (1 << (outer_iteration_count - 1)))) +
+                                (location_t) (blockdim_x * block_y) +
+                                (location_t) (2 * block_x * offset) + (location_t) (block_z << N_power);
                             
-                            // 计算omega地址
-                            location_t omega_address = 
+                            location_t omega_addresss =
                                 idx_x +
-                                (idx_y * (offset / (1 << (outer_iteration_count - 1)))) +
-                                (blockdim_x * block_y) +  // 注意：这里是block_y而不是block_x
-                                (block_x * offset);       // 注意：这里是block_x而不是block_y
+                                (location_t) (idx_y * (offset / (1 << (outer_iteration_count - 1)))) +
+                                (location_t) (blockdim_x * block_y) + (location_t) (block_x * offset);
                             
-                            // 计算共享内存地址
-                            location_t shared_address = (idx_x + (idx_y * blockdim_x));
+                            location_t shared_addresss = (idx_x + (idx_y * blockdim_x));
                             
-                            // 加载数据到本地内存
-                            if constexpr (std::is_signed<T>::value)
-                            {
-                                T input1_reg = polynomial_in[global_address];
-                                T input2_reg = polynomial_in[global_address + offset];
-                                shared_memory[shared_address] = 
-                                    OPERATOR<TU>::reduce(input1_reg, modulus_reg);
-                                shared_memory[shared_address + (blockdim_x * blockdim_y)] = 
-                                    OPERATOR<TU>::reduce(input2_reg, modulus_reg);
-                            }
-                            else
-                            {
-                                shared_memory[shared_address] = polynomial_in[global_address];
-                                shared_memory[shared_address + (blockdim_x * blockdim_y)] = 
-                                    polynomial_in[global_address + offset];
-                            }
+                            // 从全局内存加载数据到共享内存
+                            shared_memory[shared_addresss] = polynomial_in[global_addresss];
+                            shared_memory[shared_addresss + (blockdim_x * blockdim_y)] =
+                                polynomial_in[global_addresss + offset];
                             
-                            // 初始化变量
-                            int t_2 = N_power - logm - 1;
-                            int t_ = shared_index;
-                            location_t m = (location_t) 1 << logm;
-                            
-                            // 计算共享内存中的内部地址
                             int t = 1 << t_;
-                            int in_shared_address = ((shared_address >> t_) << t_) + shared_address;
+                            int in_shared_address = ((shared_addresss >> t_) << t_) + shared_addresss;
+                            location_t current_root_index;
                             
-                            // 执行蝴蝶操作
-                            if (not_last_kernel)
-                            {
-                                for (int lp = 0; lp < outer_iteration_count; lp++)
-                                {
-                                    location_t current_root_index;
-                                    if (reduction_poly_check)
-                                    { // X_N_minus
-                                        current_root_index = (omega_address >> t_2) + (mod_index << N_power);
-                                    }
-                                    else
-                                    { // X_N_plus
-                                        current_root_index = m + (omega_address >> t_2) + (mod_index << N_power);
+                            if (not_last_kernel) {
+                                for (int lp = 0; lp < outer_iteration_count; lp++) {
+                                    if (reduction_poly_check) { // X_N_minus
+                                        current_root_index = (omega_addresss >> t_2) +
+                                                            (location_t) (mod_index << N_power);
+                                    } else { // X_N_plus
+                                        current_root_index = m + (omega_addresss >> t_2) +
+                                                            (location_t) (mod_index << N_power);
                                     }
                                     
-                                    CooleyTukeyUnit(
-                                        shared_memory[in_shared_address],
-                                        shared_memory[in_shared_address + t],
-                                        root_of_unity_table[current_root_index],
-                                        modulus_reg);
+                                    CooleyTukeyUnit(shared_memory[in_shared_address],
+                                                    shared_memory[in_shared_address + t],
+                                                    root_of_unity_table[current_root_index],
+                                                    modulus[mod_index]);
                                     
-                                    // 更新变量
                                     t = t >> 1;
                                     t_2 -= 1;
                                     t_ -= 1;
                                     m <<= 1;
                                     
-                                    in_shared_address = ((shared_address >> t_) << t_) + shared_address;
+                                    in_shared_address = ((shared_addresss >> t_) << t_) + shared_addresss;
                                 }
-                            }
-                            else
-                            {
-                                // 第一部分循环
-                                for (int lp = 0; lp < (shared_index - 5); lp++)
-                                {
-                                    location_t current_root_index;
-                                    if (reduction_poly_check)
-                                    { // X_N_minus
-                                        current_root_index = (omega_address >> t_2) + (mod_index << N_power);
-                                    }
-                                    else
-                                    { // X_N_plus
-                                        current_root_index = m + (omega_address >> t_2) + (mod_index << N_power);
+                            } else {
+                                for (int lp = 0; lp < (shared_index - 5); lp++) {
+                                    if (reduction_poly_check) { // X_N_minus
+                                        current_root_index = (omega_addresss >> t_2) +
+                                                            (location_t) (mod_index << N_power);
+                                    } else { // X_N_plus
+                                        current_root_index = m + (omega_addresss >> t_2) +
+                                                            (location_t) (mod_index << N_power);
                                     }
                                     
-                                    CooleyTukeyUnit(
-                                        shared_memory[in_shared_address],
-                                        shared_memory[in_shared_address + t],
-                                        root_of_unity_table[current_root_index],
-                                        modulus_reg);
+                                    CooleyTukeyUnit(shared_memory[in_shared_address],
+                                                    shared_memory[in_shared_address + t],
+                                                    root_of_unity_table[current_root_index],
+                                                    modulus[mod_index]);
                                     
-                                    // 更新变量
                                     t = t >> 1;
                                     t_2 -= 1;
                                     t_ -= 1;
                                     m <<= 1;
                                     
-                                    in_shared_address = ((shared_address >> t_) << t_) + shared_address;
+                                    in_shared_address = ((shared_addresss >> t_) << t_) + shared_addresss;
                                 }
                                 
-                                // 第二部分循环
-                                for (int lp = 0; lp < 6; lp++)
-                                {
-                                    location_t current_root_index;
-                                    if (reduction_poly_check)
-                                    { // X_N_minus
-                                        current_root_index = (omega_address >> t_2) + (mod_index << N_power);
-                                    }
-                                    else
-                                    { // X_N_plus
-                                        current_root_index = m + (omega_address >> t_2) + (mod_index << N_power);
+                                for (int lp = 0; lp < 6; lp++) {
+                                    if (reduction_poly_check) { // X_N_minus
+                                        current_root_index = (omega_addresss >> t_2) +
+                                                            (location_t) (mod_index << N_power);
+                                    } else { // X_N_plus
+                                        current_root_index = m + (omega_addresss >> t_2) +
+                                                            (location_t) (mod_index << N_power);
                                     }
                                     
-                                    CooleyTukeyUnit(
-                                        shared_memory[in_shared_address],
-                                        shared_memory[in_shared_address + t],
-                                        root_of_unity_table[current_root_index],
-                                        modulus_reg);
+                                    CooleyTukeyUnit(shared_memory[in_shared_address],
+                                                    shared_memory[in_shared_address + t],
+                                                    root_of_unity_table[current_root_index],
+                                                    modulus[mod_index]);
                                     
-                                    // 更新变量
                                     t = t >> 1;
                                     t_2 -= 1;
                                     t_ -= 1;
                                     m <<= 1;
                                     
-                                    in_shared_address = ((shared_address >> t_) << t_) + shared_address;
+                                    in_shared_address = ((shared_addresss >> t_) << t_) + shared_addresss;
                                 }
                             }
                             
-                            // 将结果写回输出
-                            polynomial_out[global_address] = shared_memory[shared_address];
-                            polynomial_out[global_address + offset] = 
-                                shared_memory[shared_address + (blockdim_x * blockdim_y)];
+                            // 将结果写回全局内存
+                            polynomial_out[global_addresss] = shared_memory[shared_addresss];
+                            polynomial_out[global_addresss + offset] =
+                                shared_memory[shared_addresss + (blockdim_x * blockdim_y)];
                         }
                     }
                 }
@@ -1984,6 +1885,101 @@ namespace heoncpu
 //                 shared_memory[shared_addresss + (blockDim.x * blockDim.y)];
 //         }
 //     }
+    template <typename T>
+    void InverseCoreCPU(T* polynomial_in, T* polynomial_out,
+                        const Root<T>* inverse_root_of_unity_table,
+                        Modulus<T>* modulus, int shared_index, int logm, int k,
+                        int outer_iteration_count, int N_power, Ninverse<T>* n_inverse,
+                        bool last_kernel, bool reduction_poly_check, int mod_count,
+                        int griddim_x, int griddim_y, int batch_size,
+                        int blockdim_x, int blockdim_y) {
+        
+        // 计算共享内存大小（以T为单位）
+        int shared_memory_size = blockdim_x * blockdim_y * 2;
+        
+        // 遍历所有网格和块
+        for (int block_z = 0; block_z < batch_size; block_z++) {
+            for (int block_y = 0; block_y < griddim_y; block_y++) {
+                for (int block_x = 0; block_x < griddim_x; block_x++) {
+                    
+                    // 分配共享内存
+                    std::vector<T> shared_memory(shared_memory_size);
+                    
+                    const int mod_index = block_z % mod_count;
+                    
+                    int t_2 = N_power - logm - 1;
+                    location_t offset = 1 << (N_power - k - 1);
+                    int t_ = (shared_index + 1) - outer_iteration_count;
+                    int loops = outer_iteration_count;
+                    location_t m = (location_t) 1 << logm;
+                    
+                    // 处理所有线程
+                    for (int idx_y = 0; idx_y < blockdim_y; idx_y++) {
+                        for (int idx_x = 0; idx_x < blockdim_x; idx_x++) {
+                            location_t global_addresss =
+                                idx_x +
+                                (location_t) (idx_y * (offset / (1 << (outer_iteration_count - 1)))) +
+                                (location_t) (blockdim_x * block_x) +
+                                (location_t) (2 * block_y * offset) + (location_t) (block_z << N_power);
+                            
+                            location_t omega_addresss =
+                                idx_x +
+                                (location_t) (idx_y * (offset / (1 << (outer_iteration_count - 1)))) +
+                                (location_t) (blockdim_x * block_x) + (location_t) (block_y * offset);
+                            
+                            location_t shared_addresss = (idx_x + (idx_y * blockdim_x));
+                            
+                            // 从全局内存加载数据到共享内存
+                            shared_memory[shared_addresss] = polynomial_in[global_addresss];
+                            shared_memory[shared_addresss + (blockdim_x * blockdim_y)] =
+                                polynomial_in[global_addresss + offset];
+                            
+                            int t = 1 << t_;
+                            int in_shared_address = ((shared_addresss >> t_) << t_) + shared_addresss;
+                            location_t current_root_index;
+                            
+                            for (int lp = 0; lp < loops; lp++) {
+                                if (reduction_poly_check) { // X_N_minus
+                                    current_root_index =
+                                        (omega_addresss >> t_2) + (location_t) (mod_index << N_power);
+                                } else { // X_N_plus
+                                    current_root_index = m + (omega_addresss >> t_2) +
+                                                        (location_t) (mod_index << N_power);
+                                }
+                                
+                                GentlemanSandeUnit(shared_memory[in_shared_address],
+                                                shared_memory[in_shared_address + t],
+                                                inverse_root_of_unity_table[current_root_index],
+                                                modulus[mod_index]);
+                                
+                                t = t << 1;
+                                t_2 += 1;
+                                t_ += 1;
+                                m >>= 1;
+                                
+                                in_shared_address = ((shared_addresss >> t_) << t_) + shared_addresss;
+                            }
+                            
+                            // 处理最后一步
+                            if (last_kernel) {
+                                polynomial_out[global_addresss] =
+                                    OPERATOR<T>::mult(shared_memory[shared_addresss],
+                                            n_inverse[mod_index], modulus[mod_index]);
+                                polynomial_out[global_addresss + offset] = OPERATOR<T>::mult(
+                                    shared_memory[shared_addresss + (blockdim_x * blockdim_y)],
+                                    n_inverse[mod_index], modulus[mod_index]);
+                            } else {
+                                polynomial_out[global_addresss] = shared_memory[shared_addresss];
+                                polynomial_out[global_addresss + offset] =
+                                    shared_memory[shared_addresss + (blockdim_x * blockdim_y)];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 
 //     template <typename T>
 //     __global__ void InverseCore_(
@@ -2218,7 +2214,100 @@ namespace heoncpu
 //                 shared_memory[shared_addresss + (blockDim.x * blockDim.y)];
 //         }
 //     }
-
+    template <typename T>
+    void InverseCore_CPU(T* polynomial_in, T* polynomial_out,
+                        const Root<T>* inverse_root_of_unity_table,
+                        Modulus<T>* modulus, int shared_index, int logm, int k,
+                        int outer_iteration_count, int N_power, Ninverse<T>* n_inverse,
+                        bool last_kernel, bool reduction_poly_check, int mod_count,
+                        int griddim_x, int griddim_y, int batch_size,
+                        int blockdim_x, int blockdim_y) {
+        
+        // 计算共享内存大小（以T为单位）
+        int shared_memory_size = blockdim_x * blockdim_y * 2;
+        
+        // 遍历所有网格和块
+        for (int block_z = 0; block_z < batch_size; block_z++) {
+            for (int block_y = 0; block_y < griddim_y; block_y++) {
+                for (int block_x = 0; block_x < griddim_x; block_x++) {
+                    
+                    // 分配共享内存
+                    std::vector<T> shared_memory(shared_memory_size);
+                    
+                    const int mod_index = block_z % mod_count;
+                    
+                    int t_2 = N_power - logm - 1;
+                    location_t offset = 1 << (N_power - k - 1);
+                    int t_ = (shared_index + 1) - outer_iteration_count;
+                    int loops = outer_iteration_count;
+                    location_t m = (location_t) 1 << logm;
+                    
+                    // 处理所有线程
+                    for (int idx_y = 0; idx_y < blockdim_y; idx_y++) {
+                        for (int idx_x = 0; idx_x < blockdim_x; idx_x++) {
+                            location_t global_addresss =
+                                idx_x +
+                                (location_t) (idx_y * (offset / (1 << (outer_iteration_count - 1)))) +
+                                (location_t) (blockdim_x * block_y) +
+                                (location_t) (2 * block_x * offset) + (location_t) (block_z << N_power);
+                            
+                            location_t omega_addresss =
+                                idx_x +
+                                (location_t) (idx_y * (offset / (1 << (outer_iteration_count - 1)))) +
+                                (location_t) (blockdim_x * block_y) + (location_t) (block_x * offset);
+                            
+                            location_t shared_addresss = (idx_x + (idx_y * blockdim_x));
+                            
+                            // 从全局内存加载数据到共享内存
+                            shared_memory[shared_addresss] = polynomial_in[global_addresss];
+                            shared_memory[shared_addresss + (blockdim_x * blockdim_y)] =
+                                polynomial_in[global_addresss + offset];
+                            
+                            int t = 1 << t_;
+                            int in_shared_address = ((shared_addresss >> t_) << t_) + shared_addresss;
+                            location_t current_root_index;
+                            
+                            for (int lp = 0; lp < loops; lp++) {
+                                if (reduction_poly_check) { // X_N_minus
+                                    current_root_index =
+                                        (omega_addresss >> t_2) + (location_t) (mod_index << N_power);
+                                } else { // X_N_plus
+                                    current_root_index = m + (omega_addresss >> t_2) +
+                                                        (location_t) (mod_index << N_power);
+                                }
+                                
+                                GentlemanSandeUnit(shared_memory[in_shared_address],
+                                                shared_memory[in_shared_address + t],
+                                                inverse_root_of_unity_table[current_root_index],
+                                                modulus[mod_index]);
+                                
+                                t = t << 1;
+                                t_2 += 1;
+                                t_ += 1;
+                                m >>= 1;
+                                
+                                in_shared_address = ((shared_addresss >> t_) << t_) + shared_addresss;
+                            }
+                            
+                            // 处理最后一步
+                            if (last_kernel) {
+                                polynomial_out[global_addresss] =
+                                    OPERATOR<T>::mult(shared_memory[shared_addresss],
+                                            n_inverse[mod_index], modulus[mod_index]);
+                                polynomial_out[global_addresss + offset] = OPERATOR<T>::mult(
+                                    shared_memory[shared_addresss + (blockdim_x * blockdim_y)],
+                                    n_inverse[mod_index], modulus[mod_index]);
+                            } else {
+                                polynomial_out[global_addresss] = shared_memory[shared_addresss];
+                                polynomial_out[global_addresss + offset] =
+                                    shared_memory[shared_addresss + (blockdim_x * blockdim_y)];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 //     template <typename T>
 //     __global__ void ForwardCoreTranspose(
 //         T* polynomial_in, typename std::make_unsigned<T>::type* polynomial_out,
@@ -3387,243 +3476,219 @@ namespace heoncpu
 //     }
 
     template <typename T>
-    void
-    GPU_NTT(T* device_in, typename std::make_unsigned<T>::type* device_out,
-            Root<typename std::make_unsigned<T>::type>* root_of_unity_table,
-            Modulus<typename std::make_unsigned<T>::type>* modulus,
-            ntt_rns_configuration<typename std::make_unsigned<T>::type> cfg,
-            int batch_size, int mod_count)
+    void GPU_NTT(T* device_in, T* device_out, Root<T>* root_of_unity_table,
+                        Modulus<T>* modulus, ntt_rns_configuration<T> cfg,
+                        int batch_size, int mod_count)
     {
-        switch (cfg.ntt_layout)
+        if ((cfg.n_power <= 11 || cfg.n_power >= 29))
         {
-            case PerPolynomial:
-            {
-                if ((cfg.n_power <= 0 || cfg.n_power >= 29))
-                {
-                    throw std::invalid_argument("Invalid n_power range!");
-                }
+            throw std::invalid_argument("Invalid n_power range!");
+        }
 
-                auto kernel_parameters = CreateForwardNTTKernel<
-                    typename std::make_unsigned<T>::type>();
-                bool low_ring_size = (cfg.n_power < 10) ? true : false;
-                bool standart_kernel = (cfg.n_power < 25) ? true : false;
+        auto kernel_parameters = (cfg.ntt_type == FORWARD)
+                                    ? CreateForwardNTTKernel<T>()
+                                    : CreateInverseNTTKernel<T>();
+        bool standart_kernel = (cfg.n_power < 25) ? true : false;
+        T* device_in_ = device_in;
 
-                if (low_ring_size)
+        switch (cfg.ntt_type)
+        {
+            case FORWARD: //here
+                if (standart_kernel)
                 {
-                    KernelConfig& current_kernel_params =
-                        kernel_parameters[cfg.n_power][0];
-                    // ForwardCoreLowRing<<<
-                    //     dim3((batch_size +
-                    //           (current_kernel_params.blockdim_y - 1)) /
-                    //              current_kernel_params.blockdim_y,
-                    //          1, 1),
-                    //     dim3(current_kernel_params.blockdim_x,
-                    //          current_kernel_params.blockdim_y),
-                    //     current_kernel_params.shared_memory, cfg.stream>>>(
-                    //     device_in, device_out, root_of_unity_table, modulus,
-                    //     current_kernel_params.shared_index, cfg.n_power,
-                    //     cfg.zero_padding,
-                    //     (cfg.reduction_poly == ReductionPolynomial::X_N_minus),
-                    //     batch_size, mod_count); 
-                    ForwardCoreLowRing(current_kernel_params,
-                        device_in, device_out, root_of_unity_table, modulus,
-                        current_kernel_params.shared_index, cfg.n_power, cfg.zero_padding,
-                        (cfg.reduction_poly == ReductionPolynomial::X_N_minus),
-                        batch_size, mod_count);
+                    for (int i = 0; i < kernel_parameters[cfg.n_power].size(); i++)
+                    {
+                        auto& current_kernel_params =
+                            kernel_parameters[cfg.n_power][i];
+                        // ForwardCore<<<
+                        //     dim3(current_kernel_params.griddim_x,
+                        //         current_kernel_params.griddim_y, batch_size),
+                        //     dim3(current_kernel_params.blockdim_x,
+                        //         current_kernel_params.blockdim_y),
+                        //     current_kernel_params.shared_memory, cfg.stream>>>(
+                        //     device_in_, device_out, root_of_unity_table, modulus,
+                        //     current_kernel_params.shared_index,
+                        //     current_kernel_params.logm,
+                        //     current_kernel_params.outer_iteration_count,
+                        //     cfg.n_power, cfg.zero_padding,
+                        //     current_kernel_params.not_last_kernel,
+                        //     (cfg.reduction_poly == ReductionPolynomial::X_N_minus),
+                        //     mod_count);
+                        // THROW_IF_CUDA_ERROR(cudaGetLastError());
+                        ForwardCoreCPU(
+                            device_in_, device_out,
+                            root_of_unity_table, modulus,
+                            current_kernel_params.shared_index, current_kernel_params.logm, 
+                            current_kernel_params.outer_iteration_count,
+                            cfg.n_power, cfg.zero_padding, current_kernel_params.not_last_kernel,
+                            (cfg.reduction_poly == ReductionPolynomial::X_N_minus), mod_count,
+                            current_kernel_params.griddim_x, current_kernel_params.griddim_y, batch_size,
+                            current_kernel_params.blockdim_x, current_kernel_params.blockdim_y
+                        );
+                        device_in_ = device_out;
+                    }
                 }
                 else
                 {
-                    if (standart_kernel)
+                    for (int i = 0; i < kernel_parameters[cfg.n_power].size() - 1;
+                        i++)
                     {
                         auto& current_kernel_params =
-                            kernel_parameters[cfg.n_power][0];
+                            kernel_parameters[cfg.n_power][i];
                         // ForwardCore<<<
                         //     dim3(current_kernel_params.griddim_x,
-                        //          current_kernel_params.griddim_y, batch_size),
+                        //         current_kernel_params.griddim_y, batch_size),
                         //     dim3(current_kernel_params.blockdim_x,
-                        //          current_kernel_params.blockdim_y),
+                        //         current_kernel_params.blockdim_y),
                         //     current_kernel_params.shared_memory, cfg.stream>>>(
-                        //     device_in, device_out, root_of_unity_table, modulus,
+                        //     device_in_, device_out, root_of_unity_table, modulus,
                         //     current_kernel_params.shared_index,
                         //     current_kernel_params.logm,
                         //     current_kernel_params.outer_iteration_count,
                         //     cfg.n_power, cfg.zero_padding,
                         //     current_kernel_params.not_last_kernel,
-                        //     (cfg.reduction_poly ==
-                        //      ReductionPolynomial::X_N_minus),
+                        //     (cfg.reduction_poly == ReductionPolynomial::X_N_minus),
                         //     mod_count);
-                        // GPUNTT_CUDA_CHECK(cudaGetLastError());
-                        ForwardCore(current_kernel_params, batch_size,
-                            device_in, device_out, root_of_unity_table, modulus,
-                            current_kernel_params.shared_index,
-                            current_kernel_params.logm,
+                        // THROW_IF_CUDA_ERROR(cudaGetLastError());
+                        ForwardCoreCPU(
+                            device_in_, device_out,
+                            root_of_unity_table, modulus,
+                            current_kernel_params.shared_index, current_kernel_params.logm, 
                             current_kernel_params.outer_iteration_count,
-                            cfg.n_power, cfg.zero_padding,
-                            current_kernel_params.not_last_kernel,
-                            (cfg.reduction_poly == ReductionPolynomial::X_N_minus),
-                            mod_count);            
-                        for (int i = 1;
-                             i < kernel_parameters[cfg.n_power].size(); i++)
-                        {
-                            auto& current_kernel_params =
-                                kernel_parameters[cfg.n_power][i];
-                            // ForwardCore<<<dim3(current_kernel_params.griddim_x,
-                            //                    current_kernel_params.griddim_y,
-                            //                    batch_size),
-                            //               dim3(
-                            //                   current_kernel_params.blockdim_x,
-                            //                   current_kernel_params.blockdim_y),
-                            //               current_kernel_params.shared_memory,
-                            //               cfg.stream>>>(
-                            //     device_out, device_out, root_of_unity_table,
-                            //     modulus, current_kernel_params.shared_index,
-                            //     current_kernel_params.logm,
-                            //     current_kernel_params.outer_iteration_count,
-                            //     cfg.n_power, cfg.zero_padding,
-                            //     current_kernel_params.not_last_kernel,
-                            //     (cfg.reduction_poly ==
-                            //      ReductionPolynomial::X_N_minus),
-                            //     mod_count);
-                            // GPUNTT_CUDA_CHECK(cudaGetLastError());
-                            ForwardCore(current_kernel_params, batch_size,
-                                device_out, device_out, root_of_unity_table, modulus,
-                                current_kernel_params.shared_index,
-                                current_kernel_params.logm,
-                                current_kernel_params.outer_iteration_count,
-                                cfg.n_power, cfg.zero_padding,
-                                current_kernel_params.not_last_kernel,
-                                (cfg.reduction_poly == ReductionPolynomial::X_N_minus),
-                                mod_count);
-                        }
+                            cfg.n_power, cfg.zero_padding, current_kernel_params.not_last_kernel,
+                            (cfg.reduction_poly == ReductionPolynomial::X_N_minus), mod_count,
+                            current_kernel_params.griddim_x, current_kernel_params.griddim_y, batch_size,
+                            current_kernel_params.blockdim_x, current_kernel_params.blockdim_y
+                        );
+                        device_in_ = device_out;
                     }
-                    else
-                    {
-                        auto& current_kernel_params =
-                            kernel_parameters[cfg.n_power][0];
-                        // ForwardCore<<<
-                        //     dim3(current_kernel_params.griddim_x,
-                        //          current_kernel_params.griddim_y, batch_size),
-                        //     dim3(current_kernel_params.blockdim_x,
-                        //          current_kernel_params.blockdim_y),
-                        //     current_kernel_params.shared_memory, cfg.stream>>>(
-                        //     device_in, device_out, root_of_unity_table, modulus,
-                        //     current_kernel_params.shared_index,
-                        //     current_kernel_params.logm,
-                        //     current_kernel_params.outer_iteration_count,
-                        //     cfg.n_power, cfg.zero_padding,
-                        //     current_kernel_params.not_last_kernel,
-                        //     (cfg.reduction_poly ==
-                        //      ReductionPolynomial::X_N_minus),
-                        //     mod_count);
-                        // GPUNTT_CUDA_CHECK(cudaGetLastError());
-                        ForwardCore(current_kernel_params, batch_size,
-                            device_in, device_out, root_of_unity_table, modulus,
-                            current_kernel_params.shared_index,
-                            current_kernel_params.logm,
-                            current_kernel_params.outer_iteration_count,
-                            cfg.n_power, cfg.zero_padding,
-                            current_kernel_params.not_last_kernel,
-                            (cfg.reduction_poly == ReductionPolynomial::X_N_minus),
-                            mod_count);
-
-                        for (int i = 1;
-                             i < kernel_parameters[cfg.n_power].size() - 1; i++)
-                        {
-                            auto& current_kernel_params =
-                                kernel_parameters[cfg.n_power][i];
-                            // ForwardCore<<<dim3(current_kernel_params.griddim_x,
-                            //                    current_kernel_params.griddim_y,
-                            //                    batch_size),
-                            //               dim3(
-                            //                   current_kernel_params.blockdim_x,
-                            //                   current_kernel_params.blockdim_y),
-                            //               current_kernel_params.shared_memory,
-                            //               cfg.stream>>>(
-                            //     device_out, device_out, root_of_unity_table,
-                            //     modulus, current_kernel_params.shared_index,
-                            //     current_kernel_params.logm,
-                            //     current_kernel_params.outer_iteration_count,
-                            //     cfg.n_power, cfg.zero_padding,
-                            //     current_kernel_params.not_last_kernel,
-                            //     (cfg.reduction_poly ==
-                            //      ReductionPolynomial::X_N_minus),
-                            //     mod_count);
-                            // GPUNTT_CUDA_CHECK(cudaGetLastError());
-                            ForwardCore(current_kernel_params, batch_size,
-                                device_out, device_out, root_of_unity_table, modulus,
-                                current_kernel_params.shared_index,
-                                current_kernel_params.logm,
-                                current_kernel_params.outer_iteration_count,
-                                cfg.n_power, cfg.zero_padding,
-                                current_kernel_params.not_last_kernel,
-                                (cfg.reduction_poly == ReductionPolynomial::X_N_minus),
-                                mod_count);
-                        }
-                        current_kernel_params = kernel_parameters
-                            [cfg.n_power]
-                            [kernel_parameters[cfg.n_power].size() - 1];
-                        // ForwardCore_<<<
-                        //     dim3(current_kernel_params.griddim_x,
-                        //          current_kernel_params.griddim_y, batch_size),
-                        //     dim3(current_kernel_params.blockdim_x,
-                        //          current_kernel_params.blockdim_y),
-                        //     current_kernel_params.shared_memory, cfg.stream>>>(
-                        //     device_out, device_out, root_of_unity_table,
-                        //     modulus, current_kernel_params.shared_index,
-                        //     current_kernel_params.logm,
-                        //     current_kernel_params.outer_iteration_count,
-                        //     cfg.n_power, cfg.zero_padding,
-                        //     current_kernel_params.not_last_kernel,
-                        //     (cfg.reduction_poly ==
-                        //      ReductionPolynomial::X_N_minus),
-                        //     mod_count);
-                        // GPUNTT_CUDA_CHECK(cudaGetLastError());
-                        ForwardCore_(current_kernel_params, batch_size,
-                                device_out, device_out, root_of_unity_table, modulus,
-                                current_kernel_params.shared_index,
-                                current_kernel_params.logm,
-                                current_kernel_params.outer_iteration_count,
-                                cfg.n_power, cfg.zero_padding,
-                                current_kernel_params.not_last_kernel,
-                                (cfg.reduction_poly == ReductionPolynomial::X_N_minus),
-                                mod_count);
-                    }
+                    auto& current_kernel_params =
+                        kernel_parameters[cfg.n_power]
+                                        [kernel_parameters[cfg.n_power].size() -
+                                        1];
+                    // ForwardCore_<<<
+                    //     dim3(current_kernel_params.griddim_x,
+                    //         current_kernel_params.griddim_y, batch_size),
+                    //     dim3(current_kernel_params.blockdim_x,
+                    //         current_kernel_params.blockdim_y),
+                    //     current_kernel_params.shared_memory, cfg.stream>>>(
+                    //     device_in_, device_out, root_of_unity_table, modulus,
+                    //     current_kernel_params.shared_index,
+                    //     current_kernel_params.logm,
+                    //     current_kernel_params.outer_iteration_count, cfg.n_power,
+                    //     cfg.zero_padding, current_kernel_params.not_last_kernel,
+                    //     (cfg.reduction_poly == ReductionPolynomial::X_N_minus),
+                    //     mod_count);
+                    // THROW_IF_CUDA_ERROR(cudaGetLastError());
+                    ForwardCore_CPU(
+                        device_in_, device_out,
+                        root_of_unity_table , modulus ,
+                        current_kernel_params.shared_index, current_kernel_params.logm, 
+                        current_kernel_params.outer_iteration_count, cfg.n_power,
+                        cfg.zero_padding, current_kernel_params.not_last_kernel, 
+                        (cfg.reduction_poly == ReductionPolynomial::X_N_minus), mod_count,
+                        current_kernel_params.griddim_x, current_kernel_params.griddim_y, batch_size,
+                        current_kernel_params.blockdim_x, current_kernel_params.blockdim_y
+                    );
                 }
-            }
-            break;
-            case PerCoefficient:
-            {
-                if ((cfg.n_power <= 0 || cfg.n_power >= 10))
+                break;
+            case INVERSE:
+                if (standart_kernel)
                 {
-                    throw std::invalid_argument("Invalid n_power range!");
+                    for (int i = 0; i < kernel_parameters[cfg.n_power].size(); i++)
+                    {
+                        auto& current_kernel_params =
+                            kernel_parameters[cfg.n_power][i];
+                        // InverseCore<<<
+                        //     dim3(current_kernel_params.griddim_x,
+                        //         current_kernel_params.griddim_y, batch_size),
+                        //     dim3(current_kernel_params.blockdim_x,
+                        //         current_kernel_params.blockdim_y),
+                        //     current_kernel_params.shared_memory, cfg.stream>>>(
+                        //     device_in_, device_out, root_of_unity_table, modulus,
+                        //     current_kernel_params.shared_index,
+                        //     current_kernel_params.logm, current_kernel_params.k,
+                        //     current_kernel_params.outer_iteration_count,
+                        //     cfg.n_power, cfg.mod_inverse,
+                        //     current_kernel_params.not_last_kernel,
+                        //     (cfg.reduction_poly == ReductionPolynomial::X_N_minus),
+                        //     mod_count);
+                        // THROW_IF_CUDA_ERROR(cudaGetLastError());
+                        InverseCoreCPU(
+                            device_in_, device_out,
+                            root_of_unity_table, modulus,
+                            current_kernel_params.shared_index, current_kernel_params.logm, 
+                            current_kernel_params.k, current_kernel_params.outer_iteration_count, 
+                            cfg.n_power,cfg.mod_inverse, current_kernel_params.not_last_kernel, 
+                            (cfg.reduction_poly == ReductionPolynomial::X_N_minus), mod_count,
+                            current_kernel_params.griddim_x, current_kernel_params.griddim_y, batch_size,
+                            current_kernel_params.blockdim_x, current_kernel_params.blockdim_y
+                        );
+                        device_in_ = device_out;
+                    }
                 }
-
-                int log_batch_size = log2(batch_size);
-                int total_size = 1 << (cfg.n_power + log_batch_size);
-                int total_block_thread = 512;
-                int total_block_count = total_size / (total_block_thread * 2);
-                int blockdim_y = 1 << (cfg.n_power - 1);
-                int blockdim_x = total_block_thread / blockdim_y;
-                // ForwardCoreTranspose<<<
-                //     dim3(total_block_count, 1, 1),
-                //     dim3(blockdim_x, blockdim_y, 1),
-                //     ((total_block_thread * 2) + (1 << cfg.n_power)) * sizeof(T),
-                //     cfg.stream>>>(
-                //     device_in, device_out, root_of_unity_table, modulus,
-                //     cfg.n_power, log_batch_size,
-                //     (cfg.reduction_poly == ReductionPolynomial::X_N_minus),
-                //     mod_count);
-                // GPUNTT_CUDA_CHECK(cudaGetLastError());
-                ForwardCoreTranspose(total_block_thread, total_block_count,
-                    blockdim_x, blockdim_y,
-                    device_in, device_out, root_of_unity_table, modulus,
-                    cfg.n_power, log_batch_size,
-                    (cfg.reduction_poly == ReductionPolynomial::X_N_minus),
-                    mod_count);
-            }
-            break;
+                else
+                {
+                    auto& current_kernel_params = kernel_parameters[cfg.n_power][0];
+                    // InverseCore_<<<
+                    //     dim3(current_kernel_params.griddim_x,
+                    //         current_kernel_params.griddim_y, batch_size),
+                    //     dim3(current_kernel_params.blockdim_x,
+                    //         current_kernel_params.blockdim_y),
+                    //     current_kernel_params.shared_memory, cfg.stream>>>(
+                    //     device_in_, device_out, root_of_unity_table, modulus,
+                    //     current_kernel_params.shared_index,
+                    //     current_kernel_params.logm, current_kernel_params.k,
+                    //     current_kernel_params.outer_iteration_count, cfg.n_power,
+                    //     cfg.mod_inverse, current_kernel_params.not_last_kernel,
+                    //     (cfg.reduction_poly == ReductionPolynomial::X_N_minus),
+                    //     mod_count);
+                    // THROW_IF_CUDA_ERROR(cudaGetLastError());
+                    InverseCore_CPU(
+                        device_in_, device_out,
+                        root_of_unity_table, modulus,
+                        current_kernel_params.shared_index, current_kernel_params.logm, 
+                        current_kernel_params.k, current_kernel_params.outer_iteration_count, 
+                        cfg.n_power,cfg.mod_inverse, current_kernel_params.not_last_kernel, 
+                        (cfg.reduction_poly == ReductionPolynomial::X_N_minus), mod_count,
+                        current_kernel_params.griddim_x, current_kernel_params.griddim_y, batch_size,
+                        current_kernel_params.blockdim_x, current_kernel_params.blockdim_y
+                    );
+                    device_in_ = device_out;
+                    for (int i = 1; i < kernel_parameters[cfg.n_power].size(); i++)
+                    {
+                        auto& current_kernel_params =
+                            kernel_parameters[cfg.n_power][i];
+                        // InverseCore<<<
+                        //     dim3(current_kernel_params.griddim_x,
+                        //         current_kernel_params.griddim_y, batch_size),
+                        //     dim3(current_kernel_params.blockdim_x,
+                        //         current_kernel_params.blockdim_y),
+                        //     current_kernel_params.shared_memory, cfg.stream>>>(
+                        //     device_in_, device_out, root_of_unity_table, modulus,
+                        //     current_kernel_params.shared_index,
+                        //     current_kernel_params.logm, current_kernel_params.k,
+                        //     current_kernel_params.outer_iteration_count,
+                        //     cfg.n_power, cfg.mod_inverse,
+                        //     current_kernel_params.not_last_kernel,
+                        //     (cfg.reduction_poly == ReductionPolynomial::X_N_minus),
+                        //     mod_count);
+                        // THROW_IF_CUDA_ERROR(cudaGetLastError());
+                        InverseCoreCPU(
+                            device_in_, device_out,
+                            root_of_unity_table, modulus,
+                            current_kernel_params.shared_index, current_kernel_params.logm, 
+                            current_kernel_params.k, current_kernel_params.outer_iteration_count, 
+                            cfg.n_power,cfg.mod_inverse, current_kernel_params.not_last_kernel, 
+                            (cfg.reduction_poly == ReductionPolynomial::X_N_minus), mod_count,
+                            current_kernel_params.griddim_x, current_kernel_params.griddim_y, batch_size,
+                            current_kernel_params.blockdim_x, current_kernel_params.blockdim_y
+                        );
+                    }
+                }
+                break;
             default:
-                throw std::invalid_argument("Invalid ntt_layout!");
+                throw std::invalid_argument("Invalid ntt_type!");
                 break;
         }
     }

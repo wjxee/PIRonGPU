@@ -117,15 +117,14 @@ namespace heoncpu
     // // It provides multiple NTT operation with using multiple prime for
     // // RNS(Residue Number System).
     template <typename T>
-    void
-    ForwardCore(KernelConfig current_kernel_params, int batch_size, T* polynomial_in,
-                typename std::make_unsigned<T>::type* polynomial_out,
-                const Root<typename std::make_unsigned<
-                    T>::type>* root_of_unity_table,
-                Modulus<typename std::make_unsigned<T>::type>* modulus,
-                int shared_index, int logm, int outer_iteration_count,
-                int N_power, bool zero_padding, bool not_last_kernel,
-                bool reduction_poly_check, int mod_count);
+    void ForwardCoreCPU(T* polynomial_in, T* polynomial_out,
+                    const Root<T>* root_of_unity_table,
+                    Modulus<T>* modulus, int shared_index, int logm,
+                    int outer_iteration_count, int N_power,
+                    bool zero_padding, bool not_last_kernel,
+                    bool reduction_poly_check, int mod_count,
+                    int griddim_x, int griddim_y, int batch_size,
+                    int blockdim_x, int blockdim_y);
 
     // // It provides multiple NTT operation with using single prime.
     // template <typename T>
@@ -140,15 +139,14 @@ namespace heoncpu
     // // It provides multiple NTT operation with using multiple prime for
     // // RNS(Residue Number System).
     template <typename T>
-    void
-    ForwardCore_(KernelConfig current_kernel_params, int batch_size, T* polynomial_in,
-                 typename std::make_unsigned<T>::type* polynomial_out,
-                 const Root<typename std::make_unsigned<
-                     T>::type>* root_of_unity_table,
-                 Modulus<typename std::make_unsigned<T>::type>* modulus,
-                 int shared_index, int logm, int outer_iteration_count,
-                 int N_power, bool zero_padding, bool not_last_kernel,
-                 bool reduction_poly_check, int mod_count);
+    void ForwardCore_CPU(T* polynomial_in, T* polynomial_out,
+                        const Root<T>* root_of_unity_table,
+                        Modulus<T>* modulus, int shared_index, int logm,
+                        int outer_iteration_count, int N_power,
+                        bool zero_padding, bool not_last_kernel,
+                        bool reduction_poly_check, int mod_count,
+                        int griddim_x, int griddim_y, int batch_size,
+                        int blockdim_x, int blockdim_y);
 
     // // It provides multiple NTT operation with using single prime.
     // template <typename T>
@@ -193,7 +191,14 @@ namespace heoncpu
     //     int shared_index, int logm, int k, int outer_iteration_count,
     //     int N_power, Ninverse<typename std::make_unsigned<T>::type>* n_inverse,
     //     bool last_kernel, bool reduction_poly_check, int mod_count);
-
+    template <typename T>
+    void InverseCoreCPU(T* polynomial_in, T* polynomial_out,
+                        const Root<T>* inverse_root_of_unity_table,
+                        Modulus<T>* modulus, int shared_index, int logm, int k,
+                        int outer_iteration_count, int N_power, Ninverse<T>* n_inverse,
+                        bool last_kernel, bool reduction_poly_check, int mod_count,
+                        int griddim_x, int griddim_y, int batch_size,
+                        int blockdim_x, int blockdim_y);
     // // It provides multiple NTT operation with using single prime.
     // template <typename T>
     // __global__ void InverseCore_(
@@ -216,7 +221,14 @@ namespace heoncpu
     //     int shared_index, int logm, int k, int outer_iteration_count,
     //     int N_power, Ninverse<typename std::make_unsigned<T>::type>* n_inverse,
     //     bool last_kernel, bool reduction_poly_check, int mod_count);
-
+    template <typename T>
+    void InverseCore_CPU(T* polynomial_in, T* polynomial_out,
+                        const Root<T>* inverse_root_of_unity_table,
+                        Modulus<T>* modulus, int shared_index, int logm, int k,
+                        int outer_iteration_count, int N_power, Ninverse<T>* n_inverse,
+                        bool last_kernel, bool reduction_poly_check, int mod_count,
+                        int griddim_x, int griddim_y, int batch_size,
+                        int blockdim_x, int blockdim_y);
     // template <typename T>
     // __global__ void ForwardCoreTranspose(
     //     T* polynomial_in, typename std::make_unsigned<T>::type* polynomial_out,
