@@ -35,17 +35,29 @@ namespace heoncpu
         std::memset(secret_key, 0, n * sizeof(int));
 
         // 使用固定种子初始化随机数生成器
-        std::mt19937_64 rng(seed);
-        std::uniform_int_distribution<uint32_t> dist(0, UINT32_MAX);
-        std::uniform_int_distribution<int> sign_dist(0, 1);
+        //单例测试
+        // std::mt19937_64 rng(seed);
+        // std::uniform_int_distribution<uint32_t> dist(0, UINT32_MAX);
+        // std::uniform_int_distribution<int> sign_dist(0, 1);
 
         // 生成指定数量的非零元素
+        // for (int i = 0; i < hamming_weight; i++) {
+        //     // 生成随机位置 (0 到 n-1)
+        //     int location = dist(rng) & mask;
+            
+        //     // 随机生成 -1 或 1
+        //     int value = (sign_dist(rng)) ? 1 : -1;
+            
+        //     // 设置该位置的值（可能覆盖之前的值）
+        //     secret_key[location] = value;
+        // }
+        //单例测试，前hamming_weight个全为1
         for (int i = 0; i < hamming_weight; i++) {
             // 生成随机位置 (0 到 n-1)
-            int location = dist(rng) & mask;
+            int location = i;
             
             // 随机生成 -1 或 1
-            int value = (sign_dist(rng)) ? 1 : -1;
+            int value = 1;
             
             // 设置该位置的值（可能覆盖之前的值）
             secret_key[location] = value;

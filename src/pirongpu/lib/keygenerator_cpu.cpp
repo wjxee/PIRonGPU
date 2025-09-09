@@ -120,6 +120,7 @@ namespace heoncpu
         }
 
         std::vector<Data64> errors_a(2 * Q_prime_size_ * n);
+        std::fill(errors_a.begin(), errors_a.end(), Data64{0}); //单例测试
         Data64* error_poly = errors_a.data();
         Data64* a_poly = error_poly + (Q_prime_size_ * n);
 
@@ -127,10 +128,11 @@ namespace heoncpu
         //                                                   256, 0>>>(
         //     a_poly, modulus_->data(), n_power, Q_prime_size_, seed_, offset_); 
         // HEONGPU_CUDA_CHECK(cudaGetLastError());
-        modular_uniform_random_number_generation_cpu(
-            a_poly, modulus_->data(), n_power, Q_prime_size_,
-            n >> 8, 1, 1, 256, // grid_x, grid_y, grid_z, block_size
-            seed_, offset_);
+        //单例测试
+        // modular_uniform_random_number_generation_cpu(
+        //     a_poly, modulus_->data(), n_power, Q_prime_size_,
+        //     n >> 8, 1, 1, 256, // grid_x, grid_y, grid_z, block_size
+        //     seed_, offset_);
         offset_++;
 
         // modular_gaussian_random_number_generation_kernel<<<dim3((n >> 8), 1, 1),
@@ -138,10 +140,11 @@ namespace heoncpu
         //     error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
         //     offset_);
         // HEONGPU_CUDA_CHECK(cudaGetLastError()); 
-        modular_gaussian_random_number_generation_cpu(
-            error_poly, modulus_->data(), n_power, Q_prime_size_,
-            n >> 8, 1, 1, 256, // grid_x, grid_y, grid_z, block_size
-            seed_, offset_);    
+        //单例测试
+        // modular_gaussian_random_number_generation_cpu(
+        //     error_poly, modulus_->data(), n_power, Q_prime_size_,
+        //     n >> 8, 1, 1, 256, // grid_x, grid_y, grid_z, block_size
+        //     seed_, offset_);    
         offset_++;
 
         ntt_rns_configuration<Data64> cfg_ntt = {
@@ -1399,6 +1402,7 @@ namespace heoncpu
     HEKeyGenerator::generate_galois_key_method_I(Galoiskey& gk, Secretkey& sk )
     {
         std::vector<Data64> errors_a(2 * Q_prime_size_ * Q_size_ * n);
+        std::fill(errors_a.begin(), errors_a.end(), Data64{0}); //单例测试
         Data64* error_poly = errors_a.data();
         Data64* a_poly = error_poly + (Q_prime_size_ * Q_size_ * n);
 
@@ -1412,10 +1416,11 @@ namespace heoncpu
                 //     a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
                 //     offset_);
                 // HEONGPU_CUDA_CHECK(cudaGetLastError());
-                modular_uniform_random_number_generation_cpu(
-                    a_poly, modulus_->data(), n_power, Q_prime_size_,
-                    n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
-                    seed_, offset_);
+                //单例测试
+                // modular_uniform_random_number_generation_cpu(
+                //     a_poly, modulus_->data(), n_power, Q_prime_size_,
+                //     n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                //     seed_, offset_);
                 offset_++;
 
                 // modular_gaussian_random_number_generation_kernel<<<
@@ -1423,10 +1428,11 @@ namespace heoncpu
                 //     error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
                 //     offset_);
                 // HEONGPU_CUDA_CHECK(cudaGetLastError());
-                modular_gaussian_random_number_generation_cpu(
-                    error_poly, modulus_->data(), n_power, Q_prime_size_,
-                    n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
-                    seed_, offset_);
+                //单例测试
+                // modular_gaussian_random_number_generation_cpu(
+                //     error_poly, modulus_->data(), n_power, Q_prime_size_,
+                //     n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                //     seed_, offset_);
                 offset_++;
 
                 ntt_rns_configuration<Data64> cfg_ntt = {
@@ -1463,10 +1469,11 @@ namespace heoncpu
             //     a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
             //     offset_);
             // HEONGPU_CUDA_CHECK(cudaGetLastError());
-            modular_uniform_random_number_generation_cpu(
-                    a_poly, modulus_->data(), n_power, Q_prime_size_,
-                    n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
-                    seed_, offset_);
+            //单例测试
+            // modular_uniform_random_number_generation_cpu(
+            //         a_poly, modulus_->data(), n_power, Q_prime_size_,
+            //         n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
+            //         seed_, offset_);
             offset_++;
 
             // modular_gaussian_random_number_generation_kernel<<<
@@ -1474,10 +1481,11 @@ namespace heoncpu
             //     error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
             //     offset_);
             // HEONGPU_CUDA_CHECK(cudaGetLastError());
-            modular_gaussian_random_number_generation_cpu(
-                    error_poly, modulus_->data(), n_power, Q_prime_size_,
-                    n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
-                    seed_, offset_);
+            //单例测试
+            // modular_gaussian_random_number_generation_cpu(
+            //         error_poly, modulus_->data(), n_power, Q_prime_size_,
+            //         n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
+            //         seed_, offset_);
             offset_++;
 
             ntt_rns_configuration<Data64> cfg_ntt = {
@@ -1541,10 +1549,11 @@ namespace heoncpu
                 //     a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
                 //     offset_);
                 // HEONGPU_CUDA_CHECK(cudaGetLastError());
-                modular_uniform_random_number_generation_cpu(
-                    a_poly, modulus_->data(), n_power, Q_prime_size_,
-                    n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
-                    seed_, offset_);
+                //单例测试
+                // modular_uniform_random_number_generation_cpu(
+                //     a_poly, modulus_->data(), n_power, Q_prime_size_,
+                //     n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                //     seed_, offset_);
                 offset_++;
 
                 // modular_gaussian_random_number_generation_kernel<<<
@@ -1552,10 +1561,11 @@ namespace heoncpu
                 //     error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
                 //     offset_);
                 // HEONGPU_CUDA_CHECK(cudaGetLastError());
-                modular_gaussian_random_number_generation_cpu(
-                    error_poly, modulus_->data(), n_power, Q_prime_size_,
-                    n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
-                    seed_, offset_);
+                //单例测试
+                // modular_gaussian_random_number_generation_cpu(
+                //     error_poly, modulus_->data(), n_power, Q_prime_size_,
+                //     n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                //     seed_, offset_);
                 offset_++;
 
                 ntt_rns_configuration<Data64> cfg_ntt = {
@@ -1593,10 +1603,11 @@ namespace heoncpu
             //     a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
             //     offset_);
             // HEONGPU_CUDA_CHECK(cudaGetLastError());
-            modular_uniform_random_number_generation_cpu(
-                    a_poly, modulus_->data(), n_power, Q_prime_size_,
-                    n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
-                    seed_, offset_);
+            //单例测试
+            // modular_uniform_random_number_generation_cpu(
+            //         a_poly, modulus_->data(), n_power, Q_prime_size_,
+            //         n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
+            //         seed_, offset_);
             offset_++;
 
             // modular_gaussian_random_number_generation_kernel<<<
@@ -1604,10 +1615,11 @@ namespace heoncpu
             //     error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
             //     offset_);
             // HEONGPU_CUDA_CHECK(cudaGetLastError());
-            modular_gaussian_random_number_generation_cpu(
-                    error_poly, modulus_->data(), n_power, Q_prime_size_,
-                    n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
-                    seed_, offset_);
+            //单例测试
+            // modular_gaussian_random_number_generation_cpu(
+            //         error_poly, modulus_->data(), n_power, Q_prime_size_,
+            //         n >> 8, Q_size_, 1, 256, // grid_x, grid_y, grid_z, block_size
+            //         seed_, offset_);
             offset_++;
 
             ntt_rns_configuration<Data64> cfg_ntt = {
@@ -1669,6 +1681,7 @@ namespace heoncpu
         Galoiskey& gk, Secretkey& sk)
     {
         std::vector<Data64> errors_a(2 * Q_prime_size_ * d_ * n);
+        std::fill(errors_a.begin(), errors_a.end(), Data64{0});
         Data64* error_poly = errors_a.data();
         Data64* a_poly = error_poly + (Q_prime_size_ * d_ * n);
 
@@ -1682,10 +1695,11 @@ namespace heoncpu
                 //     a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
                 //     offset_);
                 // HEONGPU_CUDA_CHECK(cudaGetLastError());
-                modular_uniform_random_number_generation_cpu(
-                    a_poly, modulus_->data(), n_power, Q_prime_size_,
-                    n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
-                    seed_, offset_);
+                //单例测试
+                // modular_uniform_random_number_generation_cpu(
+                //     a_poly, modulus_->data(), n_power, Q_prime_size_,
+                //     n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                //     seed_, offset_);
                 offset_++;
 
                 // modular_gaussian_random_number_generation_kernel<<<
@@ -1693,10 +1707,11 @@ namespace heoncpu
                 //     error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
                 //     offset_);
                 // HEONGPU_CUDA_CHECK(cudaGetLastError());
-                modular_gaussian_random_number_generation_cpu(
-                    error_poly, modulus_->data(), n_power, Q_prime_size_,
-                    n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
-                    seed_, offset_);
+                //单例测试
+                // modular_gaussian_random_number_generation_cpu(
+                //     error_poly, modulus_->data(), n_power, Q_prime_size_,
+                //     n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                //     seed_, offset_);
                 offset_++;
 
                 ntt_rns_configuration<Data64> cfg_ntt = {
@@ -1736,10 +1751,11 @@ namespace heoncpu
             //     a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
             //     offset_);
             // HEONGPU_CUDA_CHECK(cudaGetLastError());
-            modular_uniform_random_number_generation_cpu(
-                    a_poly, modulus_->data(), n_power, Q_prime_size_,
-                    n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
-                    seed_, offset_);
+            //单例测试
+            // modular_uniform_random_number_generation_cpu(
+            //         a_poly, modulus_->data(), n_power, Q_prime_size_,
+            //         n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
+            //         seed_, offset_);
             offset_++;
 
             // modular_gaussian_random_number_generation_kernel<<<
@@ -1747,10 +1763,11 @@ namespace heoncpu
             //     error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
             //     offset_);
             // HEONGPU_CUDA_CHECK(cudaGetLastError());
-            modular_gaussian_random_number_generation_cpu(
-                    error_poly, modulus_->data(), n_power, Q_prime_size_,
-                    n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
-                    seed_, offset_);
+            //单例测试
+            // modular_gaussian_random_number_generation_cpu(
+            //         error_poly, modulus_->data(), n_power, Q_prime_size_,
+            //         n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
+            //         seed_, offset_);
             offset_++;
 
             ntt_rns_configuration<Data64> cfg_ntt = {
@@ -1815,10 +1832,11 @@ namespace heoncpu
                 //     a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
                 //     offset_);
                 // HEONGPU_CUDA_CHECK(cudaGetLastError());
-                modular_uniform_random_number_generation_cpu(
-                    a_poly, modulus_->data(), n_power, Q_prime_size_,
-                    n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
-                    seed_, offset_);
+                //单例测试
+                // modular_uniform_random_number_generation_cpu(
+                //     a_poly, modulus_->data(), n_power, Q_prime_size_,
+                //     n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                //     seed_, offset_);
                 offset_++;
 
                 // modular_gaussian_random_number_generation_kernel<<<
@@ -1826,10 +1844,11 @@ namespace heoncpu
                 //     error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
                 //     offset_);
                 // HEONGPU_CUDA_CHECK(cudaGetLastError());
-                modular_gaussian_random_number_generation_cpu(
-                    error_poly, modulus_->data(), n_power, Q_prime_size_,
-                    n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
-                    seed_, offset_);
+                //单例测试
+                // modular_gaussian_random_number_generation_cpu(
+                //     error_poly, modulus_->data(), n_power, Q_prime_size_,
+                //     n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
+                //     seed_, offset_);
                 offset_++;
 
                 ntt_rns_configuration<Data64> cfg_ntt = {
@@ -1869,10 +1888,11 @@ namespace heoncpu
             //     a_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
             //     offset_);
             // HEONGPU_CUDA_CHECK(cudaGetLastError());
-            modular_uniform_random_number_generation_cpu(
-                    a_poly, modulus_->data(), n_power, Q_prime_size_,
-                    n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
-                    seed_, offset_);
+            //单例测试
+            // modular_uniform_random_number_generation_cpu(
+            //         a_poly, modulus_->data(), n_power, Q_prime_size_,
+            //         n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
+            //         seed_, offset_);
             offset_++;
 
             // modular_gaussian_random_number_generation_kernel<<<
@@ -1880,10 +1900,11 @@ namespace heoncpu
             //     error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
             //     offset_);
             // HEONGPU_CUDA_CHECK(cudaGetLastError());
-            modular_gaussian_random_number_generation_cpu(
-                    error_poly, modulus_->data(), n_power, Q_prime_size_,
-                    n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
-                    seed_, offset_);
+            //单例测试
+            // modular_gaussian_random_number_generation_cpu(
+            //         error_poly, modulus_->data(), n_power, Q_prime_size_,
+            //         n >> 8, d_, 1, 256, // grid_x, grid_y, grid_z, block_size
+            //         seed_, offset_);
             offset_++;
 
             ntt_rns_configuration<Data64> cfg_ntt = {

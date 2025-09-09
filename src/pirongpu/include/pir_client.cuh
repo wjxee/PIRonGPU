@@ -86,7 +86,7 @@ namespace pirongpu
         // Only used for simple_query
         heongpu::Ciphertext get_one();
 
-      private:
+      // private:
         PirParams pir_params_;
 
         std::shared_ptr<heongpu::Secretkey> secret_key_;

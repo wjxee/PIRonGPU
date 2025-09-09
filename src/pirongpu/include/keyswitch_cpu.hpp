@@ -769,7 +769,7 @@ namespace heoncpu
             return *this;
         }
 
-      private:
+    //   private:
         scheme_type scheme_;
         keyswitching_type key_type;
 

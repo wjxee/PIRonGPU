@@ -221,7 +221,7 @@ namespace heoncpu
             return *this;
         }
 
-      private:
+      // private:
         int ring_size_;
         int coeff_modulus_count_;
         bool in_ntt_domain_;

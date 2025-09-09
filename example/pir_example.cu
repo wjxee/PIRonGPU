@@ -95,12 +95,64 @@ int main(int argc, char* argv[])
     PIRClient client(context, pir_params);
     //cpu
     heoncpu::PIRClient client_cpu(context_cpu, pir_params_cpu);
+    //test consistence
+    {
+        int checkflag=0;
+        int sk_size = client_cpu.secret_key_->secretkey_.size();
+        std::vector<int> sk_gpu(sk_size);
+        cudaMemcpy(sk_gpu.data(), client.secret_key_->secretkey_.data(), sk_size * sizeof(int), cudaMemcpyDeviceToHost);
+        for(int i=0;i<sk_size;i++){
+            if(sk_gpu[i]!=client_cpu.secret_key_->secretkey_[i]){
+                checkflag+=1;
+            } 
+        }
+        if (checkflag!=0)
+            std::cout << "sk wrong " << checkflag << std::endl;
+        else   
+            std::cout << "sk all correct " << checkflag << std::endl;
 
+    }
+    { //test pk
+        int checkflag=0;
+        int pk_size = client_cpu.public_key_->locations_.size();
+        std::vector<Data64> pk_gpu(pk_size);
+        cudaMemcpy(pk_gpu.data(), client.public_key_->locations_.data(), pk_size * sizeof(Data64), cudaMemcpyDeviceToHost);
+        for(int i=0;i<pk_size;i++){
+            if(pk_gpu[i]!=client_cpu.public_key_->locations_[i]){
+                checkflag+=1;
+            } 
+        }
+        if (checkflag!=0)
+            std::cout << "pk wrong " << checkflag << std::endl;
+        else   
+            std::cout << "pk all correct " << checkflag << std::endl;
+
+    }
     std::cout << "Main: Generating galois keys for client" << std::endl;
     heongpu::Galoiskey galois_keys = client.generate_galois_keys();
     //cpu
     heoncpu::Galoiskey galois_keys_cpu = client_cpu.generate_galois_keys();
+    //test consistence
+    {
+        int checkflag=0;
+        for (auto& pair: galois_keys_cpu.host_location_){
+            int first_ele = pair.first;
+            std::vector<Data64> second_ele = pair.second;
+            int gk_size = second_ele.size();
+            std::vector<Data64> gk_gpu(gk_size);
+            cudaMemcpy(gk_gpu.data(), galois_keys.device_location_.at(first_ele).data(), gk_size * sizeof(Data64), cudaMemcpyDeviceToHost);
+            for(int i=0;i<gk_size;i++){
+                if(gk_gpu[i]!=second_ele[i]){
+                    checkflag+=1;
+                } 
+            }
+        } 
+        if (checkflag!=0)
+            std::cout << "gk wrong " << checkflag << std::endl;
+        else   
+            std::cout << "gk all correct " << checkflag << std::endl;
 
+    }
     std::cout << "Initialization Phase Done." << std::endl;
 
     ////////////////////////////////
@@ -131,8 +183,9 @@ int main(int argc, char* argv[])
     std::vector<heoncpu::PirQuery> query_cpu;
     for (int i = 0; i < query_count; i++)
     {
-        uint64_t inner_ele_index =
-            rd() % number_of_items; // element in DB at random position
+        // uint64_t inner_ele_index =
+        //     rd() % number_of_items; // element in DB at random position
+        uint64_t inner_ele_index = i;
         uint64_t inner_index =
             client.get_fv_index(inner_ele_index); // index of FV plaintext
         uint64_t inner_offset =

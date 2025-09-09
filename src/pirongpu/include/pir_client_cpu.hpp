@@ -30,7 +30,7 @@ namespace heoncpu
         // Only used for simple_query
         Ciphertext get_one();
 
-      private:
+      // private: 单例测试
         PirParams pir_params_;
 
         std::shared_ptr<Secretkey> secret_key_;

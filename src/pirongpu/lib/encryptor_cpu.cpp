@@ -59,6 +59,7 @@ namespace heoncpu
         std::vector<Data64> output_memory((2 * n * Q_size_));
 
         std::vector<Data64> gpu_space(5 * Q_prime_size_ * n);
+        std::fill(gpu_space.begin(), gpu_space.end(), Data64{0}); //单例测试
         Data64* u_poly = gpu_space.data();
         Data64* error_poly = u_poly + (Q_prime_size_ * n);
         Data64* pk_u_poly = error_poly + (2 * Q_prime_size_ * n);
@@ -67,11 +68,15 @@ namespace heoncpu
         //                                                   256, 0, stream>>>(
         //     u_poly, modulus_->data(), n_power, Q_prime_size_, seed_, offset_);
         // HEONGPU_CUDA_CHECK(cudaGetLastError());
-        modular_ternary_random_number_generation_cpu(
-            u_poly, modulus_->data(), n_power, Q_prime_size_,
-            seed_, offset_,
-            n >> 8, 1, 1, 256 // grid_x, grid_y, grid_z, block_size
-        );
+
+        //单例测试
+        // modular_ternary_random_number_generation_cpu(
+        //     u_poly, modulus_->data(), n_power, Q_prime_size_,
+        //     seed_, offset_,
+        //     n >> 8, 1, 1, 256 // grid_x, grid_y, grid_z, block_size
+        // );
+        
+
         offset_++; // TODO: fix it.(not safe for multi-thread)
 
         // modular_gaussian_random_number_generation_kernel<<<dim3((n >> 8), 2, 1),
@@ -79,10 +84,11 @@ namespace heoncpu
         //     error_poly, modulus_->data(), n_power, Q_prime_size_, seed_,
         //     offset_);
         // HEONGPU_CUDA_CHECK(cudaGetLastError());
-        modular_gaussian_random_number_generation_cpu(
-            error_poly, modulus_->data(), n_power, Q_prime_size_,
-            n >> 8, 2, 1, 256, // grid_x, grid_y, grid_z, block_size
-            seed_, offset_);
+        //单例测试
+        // modular_gaussian_random_number_generation_cpu(
+        //     error_poly, modulus_->data(), n_power, Q_prime_size_,
+        //     n >> 8, 2, 1, 256, // grid_x, grid_y, grid_z, block_size
+        //     seed_, offset_);
         offset_++;
 
         ntt_rns_configuration<Data64> cfg_ntt = {

@@ -228,7 +228,7 @@ namespace heoncpu
             return *this;
         }
 
-      private:
+    //   private: 单例测试
         int ring_size_;
         int coeff_modulus_count_;
         int n_power_;
