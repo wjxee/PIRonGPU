@@ -80,7 +80,8 @@ namespace heoncpu
         // secretkey_gen_kernel<<<dim3((n >> 8), 1, 1), 256, 0>>>(
         //     sk.secretkey_.data(), sk.hamming_weight_, n_power, seed_);
         // HEONGPU_CUDA_CHECK(cudaGetLastError());
-        secretkey_gen_cpu(sk.secretkey_.data(), sk.hamming_weight_, n_power, seed_);
+        secretkey_gen_cpu(sk.secretkey_.data(), sk.hamming_weight_, n_power, seed_, 
+                      (n >> 8), 1, 1, 256);
 
         if (sk.location_.size() < Q_prime_size_ * n)
         {
@@ -91,7 +92,8 @@ namespace heoncpu
         //     sk.secretkey_.data(), sk.data(), modulus_->data(), n_power,
         //     Q_prime_size_); 
         secretkey_rns_cpu(sk.secretkey_.data(), sk.data(), modulus_->data(), 
-                 n_power, Q_prime_size_, n);
+                      n_power, Q_prime_size_,
+                      (n >> 8), 1, 1, 256);
 
         ntt_rns_configuration<Data64> cfg_ntt = {
             .n_power = n_power,

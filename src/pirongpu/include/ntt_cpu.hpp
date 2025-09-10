@@ -117,14 +117,16 @@ namespace heoncpu
     // // It provides multiple NTT operation with using multiple prime for
     // // RNS(Residue Number System).
     template <typename T>
-    void ForwardCoreCPU(T* polynomial_in, T* polynomial_out,
-                    const Root<T>* root_of_unity_table,
-                    Modulus<T>* modulus, int shared_index, int logm,
-                    int outer_iteration_count, int N_power,
-                    bool zero_padding, bool not_last_kernel,
-                    bool reduction_poly_check, int mod_count,
-                    int griddim_x, int griddim_y, int batch_size,
-                    int blockdim_x, int blockdim_y);
+    void ForwardCoreCPU(
+        T* polynomial_in, T* polynomial_out,
+        const Root<T>* root_of_unity_table,
+        Modulus<T>* modulus, int shared_index, int logm,
+        int outer_iteration_count, int N_power,
+        bool zero_padding, bool not_last_kernel,
+        bool reduction_poly_check, int mod_count,
+        int grid_x, int grid_y, int grid_z, 
+        int block_size_x, int block_size_y,
+        size_t shared_memory_size);
 
     // // It provides multiple NTT operation with using single prime.
     // template <typename T>

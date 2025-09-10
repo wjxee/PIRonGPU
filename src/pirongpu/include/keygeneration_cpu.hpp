@@ -10,13 +10,15 @@ namespace heoncpu
 
     // __global__ void secretkey_gen_kernel(int* secret_key, int hamming_weight,
     //                                      int n_power, int seed);
-    void secretkey_gen_cpu(int* secret_key, int hamming_weight, int n_power, int seed);
+    void secretkey_gen_cpu(int* secret_key, int hamming_weight, int n_power, int seed,
+                       int grid_x, int grid_y, int grid_z, int block_size);
 
     // __global__ void secretkey_rns_kernel(int* input, Data64* output,
     //                                      Modulus64* modulus, int n_power,
     //                                      int rns_mod_count);
     void secretkey_rns_cpu(int* input, Data64* output, Modulus64* modulus, 
-                        int n_power, int rns_mod_count, int n);
+                       int n_power, int rns_mod_count,
+                       int grid_x, int grid_y, int grid_z, int block_size);
 
     // Public Key Generation
 

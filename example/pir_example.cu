@@ -14,6 +14,16 @@ using namespace pirongpu;
 int main(int argc, char* argv[])
 {
     heoncpu::helloworld();
+    // Data64 U=68719230976;
+    // Data64 V=0;
+    // const heoncpu::Root<Data64> root(56404117254);
+    // const heoncpu::Modulus<Data64> modulus(68719230977);
+    // // modulus.value= 68719230977;
+    // // modulus.bit=36;
+    // // modulus.mu=137439444991;
+    // // const Modulus<Data64> modu = modulus;
+    // heoncpu::CooleyTukeyUnit<Data64>(U,V,root,modulus);
+
     cudaSetDevice(0); // Use it for memory pool
 
     uint64_t number_of_items = 1 << 16;

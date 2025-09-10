@@ -97,6 +97,7 @@ namespace modular_operation_cpu
             return (result >= modulus.value) ? (result - modulus.value)
                                              : result;
         }
+        
 
         // Modular Exponentiation
         // result = (base ^ exponent) % modulus
@@ -175,261 +176,319 @@ template <typename T>
 using Ninverse = typename std::conditional<std::is_same<T, Data32>::value,
                                            Ninverse32, Ninverse64>::type;
 
-// namespace modular_operation_gpu
-// {
-//     template <typename T1> class BarrettOperations
-//     {
-//         // It does not work  modulus higher than 30 bit for Data32.
-//         // It does not work  modulus higher than 62 bit for Data64.
-//       private:
-//         class uint128_t
-//         {
-//           public:
-//             // x -> LSB side
-//             // y -> MSB side
-//             ulonglong2 value;
+namespace modular_operation_gpu
+{
+    struct ulonglong2 {
+        Data64 x;
+        Data64 y;
+        // ... 其他成员和方法
+    };
 
-//             __device__ __forceinline__ uint128_t()
-//             {
-//                 value.x = 0;
-//                 value.y = 0;
-//             }
+    template <typename T1> class BarrettOperations
+    {
+        // It does not work  modulus higher than 30 bit for Data32.
+        // It does not work  modulus higher than 62 bit for Data64.
+      private:
+        class uint128_t
+        {
+          public:
+            // x -> LSB side
+            // y -> MSB side
+            ulonglong2 value;
 
-//             __device__ __forceinline__ uint128_t(const uint64_t& input)
-//             {
-//                 value.x = input;
-//                 value.y = 0;
-//             }
+            uint128_t()
+            {
+                value.x = 0;
+                value.y = 0;
+            }
+ 
+            uint128_t(const Data64 input)
+            {
+                value.x = input;
+                value.y = 0;
+            }
 
-//             __device__ __forceinline__ uint128_t(const Data64& input)
-//             {
-//                 value.x = input;
-//                 value.y = 0;
-//             }
+            uint128_t(const Data64 low,const Data64 high)
+            {
+                value.x = low;
+                value.y = high;
+            }
+ 
 
-//             __device__ __forceinline__ void operator=(const uint128_t& input)
-//             {
-//                 value.x = input.value.x;
-//                 value.y = input.value.y;
-//             }
+            void operator=(const uint128_t input)
+            {
+                value.x = input.value.x;
+                value.y = input.value.y;
+            }
 
-//             __device__ __forceinline__ void operator=(const uint64_t& input)
-//             {
-//                 value.x = input;
-//                 value.y = 0;
-//             }
+            void operator=(const Data64 input)
+            {
+                value.x = input;
+                value.y = 0;
+            }
 
-//             __device__ __forceinline__ uint128_t
-//             operator<<(const unsigned& shift)
-//             {
-//                 uint128_t result;
+            uint128_t
+            operator<<(const unsigned shift)
+            {
+                uint128_t result;
 
-//                 result.value.y = value.y << shift;
-//                 result.value.y = (value.x >> (64 - shift)) | result.value.y;
-//                 result.value.x = value.x << shift;
+                result.value.y = value.y << shift;
+                result.value.y = (value.x >> (64 - shift)) | result.value.y;
+                result.value.x = value.x << shift;
 
-//                 return result;
-//             }
+                return result;
+            }
 
-//             __device__ __forceinline__ uint128_t
-//             operator>>(const unsigned& shift)
-//             {
-//                 uint128_t result;
+            uint128_t
+            operator>>(const unsigned shift)
+            {
+                uint128_t result;
 
-//                 result.value.x = value.x >> shift;
-//                 result.value.x = (value.y << (64 - shift)) | result.value.x;
-//                 result.value.y = value.y >> shift;
+                result.value.x = value.x >> shift;
+                result.value.x = (value.y << (64 - shift)) | result.value.x;
+                result.value.y = value.y >> shift;
 
-//                 return result;
-//             }
+                return result;
+            }
 
-//             __device__ __forceinline__ uint128_t operator-(uint128_t& other)
-//             {
-//                 uint128_t result;
+            // uint128_t operator-(uint128_t& other)
+            // {
+            //     uint128_t result;
 
-//                 asm("{\n\t"
-//                     "sub.cc.u64      %1, %3, %5;    \n\t"
-//                     "subc.u64        %0, %2, %4;    \n\t"
-//                     "}"
-//                     : "=l"(result.value.y), "=l"(result.value.x)
-//                     : "l"(value.y), "l"(value.x), "l"(other.value.y),
-//                       "l"(other.value.x));
+            //     asm("{\n\t"
+            //         "sub.cc.u64      %1, %3, %5;    \n\t"
+            //         "subc.u64        %0, %2, %4;    \n\t"
+            //         "}"
+            //         : "=l"(result.value.y), "=l"(result.value.x)
+            //         : "l"(value.y), "l"(value.x), "l"(other.value.y),
+            //           "l"(other.value.x));
 
-//                 return result;
-//             }
+            //     return result;
+            // }
+            uint128_t operator-(const uint128_t other) const {
+                uint128_t result;
+                
+                // 先计算低64位的差
+                result.value.x = value.x - other.value.x;
+                
+                // 检查低64位是否发生借位
+                bool borrow = value.x < other.value.x;
+                
+                // 计算高64位的差，并考虑借位
+                result.value.y = value.y - other.value.y;
+                if (borrow) {
+                    // 如果高64位已经是0，再借位会导致下溢
+                    if (result.value.y == 0) {
+                        // 这里可以根据需求抛出异常或返回最大值
+                        throw std::underflow_error("128-bit subtraction underflow");
+                    }
+                    result.value.y -= 1; // 处理借位
+                }
+                
+                return result;
+            }
+            // uint128_t
+            // operator-=(const uint128_t& other)
+            // {
+            //     uint128_t result;
+            //     asm("{\n\t"
+            //         "sub.cc.u64      %1, %3, %5;    \n\t"
+            //         "subc.u64        %0, %2, %4;    \n\t"
+            //         "}"
+            //         : "=l"(result.value.y), "=l"(result.value.x)
+            //         : "l"(value.y), "l"(value.x), "l"(other.value.y),
+            //           "l"(other.value.x));
 
-//             __device__ __forceinline__ uint128_t
-//             operator-=(const uint128_t& other)
-//             {
-//                 uint128_t result;
-//                 asm("{\n\t"
-//                     "sub.cc.u64      %1, %3, %5;    \n\t"
-//                     "subc.u64        %0, %2, %4;    \n\t"
-//                     "}"
-//                     : "=l"(result.value.y), "=l"(result.value.x)
-//                     : "l"(value.y), "l"(value.x), "l"(other.value.y),
-//                       "l"(other.value.x));
+            //     return result;
+            // }
+        };
 
-//                 return result;
-//             }
-//         };
+      public:
+        // Modular Addition
+        // result = (input1 + input2) % modulus
+        static T1 add(const T1& input1,
+                                                 const T1& input2,
+                                                 const Modulus<T1>& modulus)
+        {
+            T1 sum = input1 + input2;
+            return (sum >= modulus.value) ? (sum - modulus.value) : sum;
+        }
 
-//       public:
-//         // Modular Addition
-//         // result = (input1 + input2) % modulus
-//         static __device__ __forceinline__ T1 add(const T1& input1,
-//                                                  const T1& input2,
-//                                                  const Modulus<T1>& modulus)
-//         {
-//             T1 sum = input1 + input2;
-//             return (sum >= modulus.value) ? (sum - modulus.value) : sum;
-//         }
+        // Modular Subtraction
+        // result = (input1 - input2) % modulus
+        static T1 sub(const T1& input1,
+                                                 const T1& input2,
+                                                 const Modulus<T1>& modulus)
+        {
+            T1 dif = input1 + modulus.value;
+            dif = dif - input2;
+            return (dif >= modulus.value) ? (dif - modulus.value) : dif;
+        }
 
-//         // Modular Subtraction
-//         // result = (input1 - input2) % modulus
-//         static __device__ __forceinline__ T1 sub(const T1& input1,
-//                                                  const T1& input2,
-//                                                  const Modulus<T1>& modulus)
-//         {
-//             T1 dif = input1 + modulus.value;
-//             dif = dif - input2;
-//             return (dif >= modulus.value) ? (dif - modulus.value) : dif;
-//         }
+        // 64-bit Multiplication for 32-bit T1
+        static Data64 mult64(const Data32& a,
+                                                        const Data32& b)
+        {
+            return static_cast<Data64>(a) * static_cast<Data64>(b);
+        }
 
-//         // 64-bit Multiplication for 32-bit T1
-//         static __device__ __forceinline__ Data64 mult64(const Data32& a,
-//                                                         const Data32& b)
-//         {
-//             return static_cast<Data64>(a) * static_cast<Data64>(b);
-//         }
+        // 128-bit Multiplication for 64-bit T1
+        // static uint128_t mult128(const Data64& a,
+        //                                                     const Data64& b)
+        // {
+        //     uint128_t result;
+        //     asm("{\n\t"
+        //         "mul.lo.u64      %1, %2, %3;    \n\t"
+        //         "mul.hi.u64      %0, %2, %3;    \n\t"
+        //         "}"
+        //         : "=l"(result.value.y), "=l"(result.value.x)
+        //         : "l"(a), "l"(b));
+        //     return result;
+        // }
+        static uint128_t mult128(Data64 a, Data64 b) {
+            // 将64位数分解为32位部分
+            Data64 a_low = a & 0xFFFFFFFF;
+            Data64 a_high = a >> 32;
+            Data64 b_low = b & 0xFFFFFFFF;
+            Data64 b_high = b >> 32;
+            
+            // 计算部分乘积
+            Data64 p0 = a_low * b_low;
+            Data64 p1 = a_low * b_high;
+            Data64 p2 = a_high * b_low;
+            Data64 p3 = a_high * b_high;
+            
+            // 累加部分乘积，考虑进位
+            Data64 low = p0;
+            Data64 high = p3;
+            
+            // 将p1和p2相加
+            Data64 mid = p1 + p2;
+            Data64 carry = (mid < p1) ? 1 : 0; // 检查加法是否溢出
+            
+            // 将中间结果加到低位
+            Data64 prev_low = low;
+            low += (mid << 32);
+            if (low < prev_low) carry++; // 检查加法是否溢出
+            
+            // 将中间结果的高位和进位加到高位
+            high += (mid >> 32) + (carry << 32);
+            
+            return uint128_t(low, high);
+        }
+        // Modular Multiplication
+        // result = (input1 * input2) % modulus
+        static T1 mult(const T1 input1,
+                        const T1 input2,
+                        const Modulus<T1> modulus)
+        {
+            if constexpr (std::is_same<T1, Data32>::value)
+            {
+                Data64 z = mult64(input1, input2);
+                Data64 w = z >> (modulus.bit - 2);
+                w = mult64(static_cast<Data32>(w), modulus.mu);
+                w = w >> (modulus.bit + 3);
+                w = mult64(static_cast<Data32>(w), modulus.value);
+                z = z - w;
+                return static_cast<T1>(
+                    (z >= modulus.value) ? (z - modulus.value) : z);
+            }
+            else
+            {
+                uint128_t z = mult128(input1, input2);
+                uint128_t w = z >> (modulus.bit - 2);
+                w = mult128(w.value.x, modulus.mu);
+                w = w >> (modulus.bit + 3);
+                w = mult128(w.value.x, modulus.value);
+                z = z - w;
+                return (z.value.x >= modulus.value)
+                           ? (z.value.x - modulus.value)
+                           : z.value.x;
+            }
+        }
 
-//         // 128-bit Multiplication for 64-bit T1
-//         static __device__ __forceinline__ uint128_t mult128(const Data64& a,
-//                                                             const Data64& b)
-//         {
-//             uint128_t result;
-//             asm("{\n\t"
-//                 "mul.lo.u64      %1, %2, %3;    \n\t"
-//                 "mul.hi.u64      %0, %2, %3;    \n\t"
-//                 "}"
-//                 : "=l"(result.value.y), "=l"(result.value.x)
-//                 : "l"(a), "l"(b));
-//             return result;
-//         }
+        // Barrett Reduction
+        // result = input1 % modulus
+        static T1 reduce(const T1 input,
+                                                    const Modulus<T1> modulus)
+        {
+            if constexpr (std::is_same<T1, Data32>::value)
+            {
+                Data64 z = static_cast<Data64>(input);
+                Data64 w = z >> (modulus.bit - 2);
+                w = mult64(static_cast<Data32>(w), modulus.mu);
+                w = w >> (modulus.bit + 3);
+                w = mult64(static_cast<Data32>(w), modulus.value);
+                z = z - w;
+                return static_cast<T1>(
+                    (z >= modulus.value) ? (z - modulus.value) : z);
+            }
+            else
+            {
+                uint128_t z(input);
+                uint128_t w = z >> (modulus.bit - 2);
+                w = mult128(w.value.x, modulus.mu);
+                w = w >> (modulus.bit + 3);
+                w = mult128(w.value.x, modulus.value);
+                z = z - w;
+                return (z.value.x >= modulus.value)
+                           ? (z.value.x - modulus.value)
+                           : z.value.x;
+            }
+        }
 
-//         // Modular Multiplication
-//         // result = (input1 * input2) % modulus
-//         static __device__ __forceinline__ T1 mult(const T1& input1,
-//                                                   const T1& input2,
-//                                                   const Modulus<T1>& modulus)
-//         {
-//             if constexpr (std::is_same<T1, Data32>::value)
-//             {
-//                 Data64 z = mult64(input1, input2);
-//                 Data64 w = z >> (modulus.bit - 2);
-//                 w = mult64(static_cast<Data32>(w), modulus.mu);
-//                 w = w >> (modulus.bit + 3);
-//                 w = mult64(static_cast<Data32>(w), modulus.value);
-//                 z = z - w;
-//                 return static_cast<T1>(
-//                     (z >= modulus.value) ? (z - modulus.value) : z);
-//             }
-//             else
-//             {
-//                 uint128_t z = mult128(input1, input2);
-//                 uint128_t w = z >> (modulus.bit - 2);
-//                 w = mult128(w.value.x, modulus.mu);
-//                 w = w >> (modulus.bit + 3);
-//                 w = mult128(w.value.x, modulus.value);
-//                 z = z - w;
-//                 return (z.value.x >= modulus.value)
-//                            ? (z.value.x - modulus.value)
-//                            : z.value.x;
-//             }
-//         }
+        // Forced Reduction (Repeated Reduction Until Input < Modulus)
+        // result = input1 % modulus
+        static T1
+        reduce_forced(const T1 input, const Modulus<T1> modulus)
+        {
+            T1 result = input;
+            while (result >= modulus.value)
+            {
+                result = reduce(result, modulus);
+            }
+            return result;
+        }
 
-//         // Barrett Reduction
-//         // result = input1 % modulus
-//         static __device__ __forceinline__ T1 reduce(const T1& input,
-//                                                     const Modulus<T1>& modulus)
-//         {
-//             if constexpr (std::is_same<T1, Data32>::value)
-//             {
-//                 Data64 z = static_cast<Data64>(input);
-//                 Data64 w = z >> (modulus.bit - 2);
-//                 w = mult64(static_cast<Data32>(w), modulus.mu);
-//                 w = w >> (modulus.bit + 3);
-//                 w = mult64(static_cast<Data32>(w), modulus.value);
-//                 z = z - w;
-//                 return static_cast<T1>(
-//                     (z >= modulus.value) ? (z - modulus.value) : z);
-//             }
-//             else
-//             {
-//                 uint128_t z(input);
-//                 uint128_t w = z >> (modulus.bit - 2);
-//                 w = mult128(w.value.x, modulus.mu);
-//                 w = w >> (modulus.bit + 3);
-//                 w = mult128(w.value.x, modulus.value);
-//                 z = z - w;
-//                 return (z.value.x >= modulus.value)
-//                            ? (z.value.x - modulus.value)
-//                            : z.value.x;
-//             }
-//         }
+        // Forced Reduction
+        // result = input1 % modulus
+        // static T1 reduce(T1* input1,
+        //                                             const Modulus<T1>& modulus)
+        // {
+        //     if constexpr (std::is_same<T1, Data32>::value)
+        //     {
+        //         Data64 z = (static_cast<Data64>(input1[1]) << 32) |
+        //                    static_cast<Data32>(input1[0]);
+        //         Data64 w = z >> (modulus.bit - 2);
+        //         w = mult64(static_cast<Data32>(w), modulus.mu);
+        //         w = w >> (modulus.bit + 3);
+        //         w = mult64(static_cast<Data32>(w), modulus.value);
+        //         z = z - w;
+        //         return static_cast<T1>(
+        //             (z >= modulus.value) ? (z - modulus.value) : z);
+        //     }
+        //     else
+        //     {
+        //         uint128_t z;
+        //         z.value.x = input1[0];
+        //         z.value.y = input1[1];
+        //         uint128_t w = z >> (modulus.bit - 2);
+        //         w = mult128(w.value.x, modulus.mu);
+        //         w = w >> (modulus.bit + 3);
+        //         w = mult128(w.value.x, modulus.value);
+        //         z = z - w;
+        //         return (z.value.x >= modulus.value)
+        //                    ? (z.value.x - modulus.value)
+        //                    : z.value.x;
+        //     }
+        // }
+    };
 
-//         // Forced Reduction (Repeated Reduction Until Input < Modulus)
-//         // result = input1 % modulus
-//         static __device__ __forceinline__ T1
-//         reduce_forced(const T1& input, const Modulus<T1>& modulus)
-//         {
-//             T1 result = input;
-//             while (result >= modulus.value)
-//             {
-//                 result = reduce(result, modulus);
-//             }
-//             return result;
-//         }
+} // namespace modular_operation_gpu
 
-//         // Forced Reduction
-//         // result = input1 % modulus
-//         static __device__ __forceinline__ T1 reduce(T1* input1,
-//                                                     const Modulus<T1>& modulus)
-//         {
-//             if constexpr (std::is_same<T1, Data32>::value)
-//             {
-//                 Data64 z = (static_cast<Data64>(input1[1]) << 32) |
-//                            static_cast<Data32>(input1[0]);
-//                 Data64 w = z >> (modulus.bit - 2);
-//                 w = mult64(static_cast<Data32>(w), modulus.mu);
-//                 w = w >> (modulus.bit + 3);
-//                 w = mult64(static_cast<Data32>(w), modulus.value);
-//                 z = z - w;
-//                 return static_cast<T1>(
-//                     (z >= modulus.value) ? (z - modulus.value) : z);
-//             }
-//             else
-//             {
-//                 uint128_t z;
-//                 z.value.x = input1[0];
-//                 z.value.y = input1[1];
-//                 uint128_t w = z >> (modulus.bit - 2);
-//                 w = mult128(w.value.x, modulus.mu);
-//                 w = w >> (modulus.bit + 3);
-//                 w = mult128(w.value.x, modulus.value);
-//                 z = z - w;
-//                 return (z.value.x >= modulus.value)
-//                            ? (z.value.x - modulus.value)
-//                            : z.value.x;
-//             }
-//         }
-//     };
+template <typename T>
+using OPERATOR_GPU = modular_operation_gpu::BarrettOperations<T>;
 
-// } // namespace modular_operation_gpu
-
-// template <typename T>
-// using OPERATOR_GPU = modular_operation_gpu::BarrettOperations<T>;
-
-// typedef OPERATOR_GPU<Data32> OPERATOR_GPU_32;
-// typedef OPERATOR_GPU<Data64> OPERATOR_GPU_64;
+typedef OPERATOR_GPU<Data32> OPERATOR_GPU_32;
+typedef OPERATOR_GPU<Data64> OPERATOR_GPU_64;
 }

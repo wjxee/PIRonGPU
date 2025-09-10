@@ -27,40 +27,50 @@ namespace heoncpu
     // }
 
     // 纯 CPU 版本的密钥生成函数
-    void secretkey_gen_cpu(int* secret_key, int hamming_weight, int n_power, int seed) {
-        int n = 1 << n_power;  // 计算数组大小 (2^n_power)
-        int mask = n - 1;       // 掩码等同于 (1 << n_power) - 1
+    void secretkey_gen_cpu(int* secret_key, int hamming_weight, int n_power, int seed,
+                       int grid_x, int grid_y, int grid_z, int block_size) {
+        // 计算总线程数
+        int total_threads = grid_x * grid_y * grid_z * block_size;
+        int n = 1 << n_power; // 计算n = 2^(n_power)
+        
+        // 初始化secret_key数组为0
+        for (int i = 0; i < n; i++) {
+            secret_key[i] = 0;
+        }
 
-        // 初始化整个数组为 0
-        std::memset(secret_key, 0, n * sizeof(int));
+        // 模拟CUDA的线程网格结构
+        for (int block_z = 0; block_z < grid_z; block_z++) {
+            for (int block_y = 0; block_y < grid_y; block_y++) {
+                for (int block_x = 0; block_x < grid_x; block_x++) {
+                    for (int thread_id = 0; thread_id < block_size; thread_id++) {
+                        // 计算全局线程索引（模拟CUDA的线程索引计算）
+                        int idx = ((block_x + block_y * grid_x + block_z * grid_x * grid_y) * block_size) + thread_id;
+                        
+                        // 只有前hamming_weight个线程执行操作
+                        // if (idx < hamming_weight) {
+                        //     // 为每个线程创建独立的随机数生成器
+                        //     std::mt19937_64 gen(seed + idx); // 使用种子+索引确保随机性
+                        //     std::uniform_int_distribution<int> dist(0, (1 << n_power) - 1);
+                        //     std::uniform_int_distribution<int> dist_val(0, 3);
+                            
+                        //     int location = dist(gen);
+                        //     int value = (dist_val(gen) & 2) * 2 - 1; // -1 or 1
+                            
+                        //     // 直接赋值（单线程无需原子操作）
+                        //     secret_key[location] = value;
+                        // }
+                        //单例测试
+                        if (idx < hamming_weight) { 
 
-        // 使用固定种子初始化随机数生成器
-        //单例测试
-        // std::mt19937_64 rng(seed);
-        // std::uniform_int_distribution<uint32_t> dist(0, UINT32_MAX);
-        // std::uniform_int_distribution<int> sign_dist(0, 1);
-
-        // 生成指定数量的非零元素
-        // for (int i = 0; i < hamming_weight; i++) {
-        //     // 生成随机位置 (0 到 n-1)
-        //     int location = dist(rng) & mask;
-            
-        //     // 随机生成 -1 或 1
-        //     int value = (sign_dist(rng)) ? 1 : -1;
-            
-        //     // 设置该位置的值（可能覆盖之前的值）
-        //     secret_key[location] = value;
-        // }
-        //单例测试，前hamming_weight个全为1
-        for (int i = 0; i < hamming_weight; i++) {
-            // 生成随机位置 (0 到 n-1)
-            int location = i;
-            
-            // 随机生成 -1 或 1
-            int value = 1;
-            
-            // 设置该位置的值（可能覆盖之前的值）
-            secret_key[location] = value;
+                            int location = idx;
+                            int value = 1; // -1 or 1
+                            
+                            // 直接赋值（单线程无需原子操作）
+                            secret_key[location] = value;
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -92,23 +102,45 @@ namespace heoncpu
 //     }
 
     void secretkey_rns_cpu(int* input, Data64* output, Modulus64* modulus, 
-                        int n_power, int rns_mod_count, int n) {
-        // 遍历所有输入元素 (相当于 CUDA 中的线程索引)
-        for (int idx = 0; idx < n; idx++) {
-            int sk_ = input[idx];
-            
-            // 对于每个 RNS 模数
-            for (int i = 0; i < rns_mod_count; i++) {
-                int location = i << n_power; // 计算位置偏移
-                
-                Data64 result;
-                if (sk_ < 0) {
-                    result = modulus[i].value - 1;
-                } else {
-                    result = static_cast<Data64>(sk_);
+                       int n_power, int rns_mod_count,
+                       int grid_x, int grid_y, int grid_z, int block_size) {
+        // 计算总线程数
+        int total_threads = grid_x * grid_y * grid_z * block_size;
+        int n = 1 << n_power; // 计算n = 2^(n_power)
+        
+        // 确保不会越界访问
+        if (total_threads > n) {
+            total_threads = n;
+        }
+        
+        // 模拟CUDA的线程网格结构
+        for (int block_z = 0; block_z < grid_z; block_z++) {
+            for (int block_y = 0; block_y < grid_y; block_y++) {
+                for (int block_x = 0; block_x < grid_x; block_x++) {
+                    for (int thread_id = 0; thread_id < block_size; thread_id++) {
+                        // 计算全局线程索引（模拟CUDA的线程索引计算）
+                        int idx = ((block_x + block_y * grid_x + block_z * grid_x * grid_y) * block_size) + thread_id;
+                        
+                        // 确保不超出数组范围
+                        if (idx >= n) continue;
+                        
+                        int sk_ = input[idx];
+                        
+                        // 处理每个RNS模数
+                        for (int i = 0; i < rns_mod_count; i++) {
+                            int location = i << n_power;
+                            
+                            Data64 result;
+                            if (sk_ < 0) {
+                                result = modulus[i].value - 1;
+                            } else {
+                                result = static_cast<Data64>(sk_);
+                            }
+                            
+                            output[idx + location] = result;
+                        }
+                    }
                 }
-                
-                output[idx + location] = result;
             }
         }
     }
