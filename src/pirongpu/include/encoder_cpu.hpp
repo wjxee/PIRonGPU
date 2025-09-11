@@ -1,7 +1,7 @@
 #pragma once 
 // #include "common.cuh"
 // #include "cuda_runtime.h"
-// #include "encoding.hpp"
+#include "encoding_cpu.hpp"
 #include "ntt_cpu.hpp"
 // #include "fft.hpp"
 #include "complex_cpu.hpp"
@@ -586,31 +586,31 @@ namespace heoncpu
     //      * @param message Vector where the decoded message will be stored.
     //      * @param plain Plaintext object to be decoded.
     //      */
-    //     __host__ void
-    //     decode(std::vector<uint64_t>& message, Plaintext& plain,
-    //            const ExecutionOptions& options = ExecutionOptions())
-    //     {
-    //         switch (static_cast<int>(scheme_))
-    //         {
-    //             case 1: // BFV
-    //                 input_storage_manager(
-    //                     plain,
-    //                     [&](Plaintext& plain_)
-    //                     { decode_bfv(message, plain_, options.stream_); },
-    //                     options, false);
-    //                 break;
-    //             case 2: // CKKS
-    //                 throw std::invalid_argument(
-    //                     "CKKS message can not be uint64_t");
-    //                 break;
-    //             case 3: // BGV
+        void
+        decode(std::vector<uint64_t>& message, Plaintext& plain)
+        {
+            switch (static_cast<int>(scheme_))
+            {
+                case 1: // BFV
+                    // input_storage_manager(
+                    //     plain,
+                    //     [&](Plaintext& plain_)
+                    //     { decode_bfv(message, plain_, options.stream_); },
+                    //     options, false);
+                    decode_bfv(message, plain);
+                    break;
+                case 2: // CKKS
+                    throw std::invalid_argument(
+                        "CKKS message can not be uint64_t");
+                    break;
+                case 3: // BGV
 
-    //                 break;
-    //             default:
-    //                 throw std::invalid_argument("Invalid Scheme Type");
-    //                 break;
-    //         }
-    //     }
+                    break;
+                default:
+                    throw std::invalid_argument("Invalid Scheme Type");
+                    break;
+            }
+        }
 
     //     /**
     //      * @brief Decodes a plaintext into a vector of signed 64-bit integers.
@@ -878,8 +878,8 @@ namespace heoncpu
 
     //     //
 
-    //     __host__ void decode_bfv(std::vector<uint64_t>& message,
-    //                              Plaintext& plain, const cudaStream_t stream);
+      void decode_bfv(std::vector<uint64_t>& message,
+                                 Plaintext& plain );
 
     //     __host__ void decode_bfv(std::vector<int64_t>& message,
     //                              Plaintext& plain, const cudaStream_t stream);

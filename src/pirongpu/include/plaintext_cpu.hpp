@@ -275,7 +275,7 @@ namespace heoncpu
 
         int memory_size();
         void memory_clear();
-        // void memory_set(DeviceVector<Data64>&& new_device_vector);
+        void memory_set(std::vector<Data64>&& new_host_vector);
 
         // void copy_to_device(cudaStream_t stream);
         // void remove_from_device(cudaStream_t stream);

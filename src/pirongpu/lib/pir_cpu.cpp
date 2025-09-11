@@ -242,48 +242,82 @@ namespace heoncpu
 
     //     plain[idx] = ct_reg;
     // }
+    void compose_to_ciphertext_piece_cpu(
+        Data64* ct, Data64* plain, int shift,
+        int grid_x, int grid_y, int grid_z, int block_size) {
+        
+        // 计算总线程数
+        int total_threads = grid_x * grid_y * grid_z * block_size;
+        
+        // 模拟CUDA的线程网格结构
+        for (int block_z = 0; block_z < grid_z; block_z++) {
+            for (int block_y = 0; block_y < grid_y; block_y++) {
+                for (int block_x = 0; block_x < grid_x; block_x++) {
+                    for (int thread_id = 0; thread_id < block_size; thread_id++) {
+                        // 计算全局线程索引（模拟CUDA的线程索引计算）
+                        int idx = ((block_x + block_y * grid_x + block_z * grid_x * grid_y) * block_size) + thread_id;
+                        
+                        Data64 ct_reg = 0;
+                        if (shift != 0) {
+                            ct_reg = ct[idx];
+                        }
+                        
+                        Data64 plain_reg = plain[idx];
+                        
+                        ct_reg = ct_reg + (plain_reg << shift);
+                        
+                        ct[idx] = ct_reg;
+                    }
+                }
+            }
+        }
+    }
+    void compose_to_ciphertext(int poly_modulus_degree, Modulus64& plain_mod,
+                               std::vector<Modulus64>& coeff_mod,
+                               std::vector<Plaintext>& pts,
+                               Ciphertext& ct)
+    {
+        std::vector<Modulus64> coeff_mod_;
+        coeff_mod_.assign(coeff_mod.begin(), coeff_mod.end() - 1);
 
-    // void compose_to_ciphertext(int poly_modulus_degree, Modulus64& plain_mod,
-    //                            std::vector<Modulus64>& coeff_mod,
-    //                            std::vector<heongpu::Plaintext>& pts,
-    //                            heongpu::Ciphertext& ct)
-    // {
-    //     std::vector<Modulus64> coeff_mod_;
-    //     coeff_mod_.assign(coeff_mod.begin(), coeff_mod.end() - 1);
+        size_t ct_poly_count =
+            pts.size() / compute_expansion_ratio(plain_mod, coeff_mod_);
 
-    //     size_t ct_poly_count =
-    //         pts.size() / compute_expansion_ratio(plain_mod, coeff_mod_);
+        int pointer_inter = 0;
 
-    //     int pointer_inter = 0;
+        const uint32_t pt_bits_per_coeff = log2(plain_mod.value);
+        const auto coeff_count = poly_modulus_degree;
+        const auto coeff_mod_count = coeff_mod_.size();
 
-    //     const uint32_t pt_bits_per_coeff = log2(plain_mod.value);
-    //     const auto coeff_count = poly_modulus_degree;
-    //     const auto coeff_mod_count = coeff_mod_.size();
+        for (size_t poly_index = 0; poly_index < ct_poly_count; ++poly_index)
+        {
+            for (size_t coeff_mod_index = 0; coeff_mod_index < coeff_mod_count;
+                 ++coeff_mod_index)
+            {
+                const double coeff_bit_size =
+                    log2(coeff_mod_[coeff_mod_index].value);
+                const size_t local_expansion_ratio =
+                    ceil(coeff_bit_size / pt_bits_per_coeff);
 
-    //     for (size_t poly_index = 0; poly_index < ct_poly_count; ++poly_index)
-    //     {
-    //         for (size_t coeff_mod_index = 0; coeff_mod_index < coeff_mod_count;
-    //              ++coeff_mod_index)
-    //         {
-    //             const double coeff_bit_size =
-    //                 log2(coeff_mod_[coeff_mod_index].value);
-    //             const size_t local_expansion_ratio =
-    //                 ceil(coeff_bit_size / pt_bits_per_coeff);
-
-    //             size_t shift = 0;
-    //             for (size_t i = 0; i < local_expansion_ratio; ++i)
-    //             {
-    //                 compose_to_ciphertext_piece<<<
-    //                     dim3((coeff_count >> 8), 1, 1), 256>>>(
-    //                     ct.data() + (coeff_mod_index * coeff_count) +
-    //                         (coeff_mod_count * poly_index * coeff_count),
-    //                     pts[pointer_inter].data(), shift);
-
-    //                 pointer_inter++;
-    //                 shift += pt_bits_per_coeff;
-    //             }
-    //         }
-    //     }
-    // }
+                size_t shift = 0;
+                for (size_t i = 0; i < local_expansion_ratio; ++i)
+                {
+                    // compose_to_ciphertext_piece<<<
+                    //     dim3((coeff_count >> 8), 1, 1), 256>>>(
+                    //     ct.data() + (coeff_mod_index * coeff_count) +
+                    //         (coeff_mod_count * poly_index * coeff_count),
+                    //     pts[pointer_inter].data(), shift);
+                    compose_to_ciphertext_piece_cpu(
+                        ct.data() + (coeff_mod_index * coeff_count) +
+                            (coeff_mod_count * poly_index * coeff_count), 
+                            pts[pointer_inter].data(), shift,
+                        (coeff_count >> 8), 1, 1, 256
+                    );        
+                    pointer_inter++;
+                    shift += pt_bits_per_coeff;
+                }
+            }
+        }
+    }
 
 } // namespace pirongpu

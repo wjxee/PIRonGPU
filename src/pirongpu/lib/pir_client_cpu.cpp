@@ -120,106 +120,106 @@ namespace heoncpu
         return result;
     }
 
-    // std::vector<uint8_t> PIRClient::extract_bytes(Plaintext& pt,
-    //                                               uint64_t offset)
-    // {
-    //     uint32_t N = context_->poly_modulus_degree();
-    //     uint32_t logt = floor(log2(context_->plain_modulus().value));
-    //     uint32_t bytes_per_ptxt =
-    //         pir_params_.elements_per_plaintext * pir_params_.ele_size;
+    std::vector<uint8_t> PIRClient::extract_bytes(Plaintext& pt,
+                                                  uint64_t offset)
+    {
+        uint32_t N = context_->poly_modulus_degree();
+        uint32_t logt = floor(log2(context_->plain_modulus().value));
+        uint32_t bytes_per_ptxt =
+            pir_params_.elements_per_plaintext * pir_params_.ele_size;
 
-    //     // Convert from FV plaintext (polynomial) to database element at the
-    //     // client
-    //     std::vector<uint8_t> elems(bytes_per_ptxt);
-    //     std::vector<uint64_t> coeffs;
-    //     // Message coeffs_gpu(*context_);
-    //     encoder_->decode(coeffs, pt);
-    //     // coeffs_gpu.device_to_host(coeffs);
+        // Convert from FV plaintext (polynomial) to database element at the
+        // client
+        std::vector<uint8_t> elems(bytes_per_ptxt);
+        std::vector<uint64_t> coeffs;
+        // Message coeffs_gpu(*context_);
+        encoder_->decode(coeffs, pt);
+        // coeffs_gpu.device_to_host(coeffs);
 
-    //     coeffs_to_bytes(logt, coeffs, elems.data(), bytes_per_ptxt,
-    //                     pir_params_.ele_size);
-    //     return std::vector<uint8_t>(
-    //         elems.begin() + offset * pir_params_.ele_size,
-    //         elems.begin() + (offset + 1) * pir_params_.ele_size);
-    // }
+        coeffs_to_bytes(logt, coeffs, elems.data(), bytes_per_ptxt,
+                        pir_params_.ele_size);
+        return std::vector<uint8_t>(
+            elems.begin() + offset * pir_params_.ele_size,
+            elems.begin() + (offset + 1) * pir_params_.ele_size);
+    }
 
-    // Plaintext PIRClient::decode_reply(PirReply& reply)
-    // {
-    //     // EncryptionParameters parms;
-    //     // parms_id_type parms_id;
-    //     if (pir_params_.enable_mswitching)
-    //     {
-    //         throw std::invalid_argument("Modulus switching is not supported!");
-    //     }
-    //     else
-    //     {
-    //     }
+    Plaintext PIRClient::decode_reply(PirReply& reply)
+    {
+        // EncryptionParameters parms;
+        // parms_id_type parms_id;
+        if (pir_params_.enable_mswitching)
+        {
+            throw std::invalid_argument("Modulus switching is not supported!");
+        }
+        else
+        {
+        }
 
-    //     std::vector<Modulus64> vec_key_modulus = context_->key_modulus();
+        std::vector<Modulus64> vec_key_modulus = context_->key_modulus();
 
-    //     std::vector<Modulus64> coeff_mod_;
-    //     coeff_mod_.assign(vec_key_modulus.begin(), vec_key_modulus.end() - 1);
-    //     Modulus64 mod_plain = context_->plain_modulus();
-    //     uint32_t exp_ratio = compute_expansion_ratio(mod_plain, coeff_mod_);
-    //     uint32_t recursion_level = pir_params_.d;
+        std::vector<Modulus64> coeff_mod_;
+        coeff_mod_.assign(vec_key_modulus.begin(), vec_key_modulus.end() - 1);
+        Modulus64 mod_plain = context_->plain_modulus();
+        uint32_t exp_ratio = compute_expansion_ratio(mod_plain, coeff_mod_);
+        uint32_t recursion_level = pir_params_.d;
 
-    //     std::cout << "exp_ratio: " << exp_ratio << std::endl;
+        std::cout << "exp_ratio: " << exp_ratio << std::endl;
 
-    //     std::vector<Ciphertext> temp = reply;
-    //     uint32_t ciphertext_size = 2;
-    //     std::cout << "ciphertext_size: " << ciphertext_size << std::endl;
+        std::vector<Ciphertext> temp = reply;
+        uint32_t ciphertext_size = 2;
+        std::cout << "ciphertext_size: " << ciphertext_size << std::endl;
 
-    //     for (uint32_t i = 0; i < recursion_level; i++)
-    //     {
-    //         std::cout << "Client: " << i + 1 << "/ " << recursion_level
-    //                   << "-th decryption layer started." << std::endl;
-    //         std::vector<Ciphertext> newtemp;
-    //         std::vector<Plaintext> tempplain;
+        for (uint32_t i = 0; i < recursion_level; i++)
+        {
+            std::cout << "Client: " << i + 1 << "/ " << recursion_level
+                      << "-th decryption layer started." << std::endl;
+            std::vector<Ciphertext> newtemp;
+            std::vector<Plaintext> tempplain;
 
-    //         for (uint32_t j = 0; j < temp.size(); j++)
-    //         {
-    //             Plaintext ptxt(*context_);
-    //             decryptor_->decrypt(ptxt, temp[j]);
-    //             tempplain.push_back(ptxt);
+            for (uint32_t j = 0; j < temp.size(); j++)
+            {
+                Plaintext ptxt(*context_);
+                decryptor_->decrypt(ptxt, temp[j]);
+                tempplain.push_back(ptxt);
 
-    //             if ((j + 1) % (exp_ratio * ciphertext_size) == 0 && j > 0)
-    //             {
-    //                 // Combine into one ciphertext.
-    //                 Ciphertext combined(*context_);
+                if ((j + 1) % (exp_ratio * ciphertext_size) == 0 && j > 0)
+                {
+                    // Combine into one ciphertext.
+                    Ciphertext combined(*context_);
 
-    //                 compose_to_ciphertext(context_->poly_modulus_degree(),
-    //                                       mod_plain, vec_key_modulus, tempplain,
-    //                                       combined);
-    //                 newtemp.push_back(combined);
-    //                 tempplain.clear();
-    //             }
-    //         }
-    //         std::cout << "Client: done." << std::endl;
-    //         std::cout << std::endl;
-    //         if (i == recursion_level - 1)
-    //         {
-    //             assert(temp.size() == 1);
-    //             return tempplain[0];
-    //         }
-    //         else
-    //         {
-    //             tempplain.clear();
-    //             temp = newtemp;
-    //         }
-    //     }
+                    compose_to_ciphertext(context_->poly_modulus_degree(),
+                                          mod_plain, vec_key_modulus, tempplain,
+                                          combined);
+                    newtemp.push_back(combined);
+                    tempplain.clear();
+                }
+            }
+            std::cout << "Client: done." << std::endl;
+            std::cout << std::endl;
+            if (i == recursion_level - 1)
+            {
+                assert(temp.size() == 1);
+                return tempplain[0];
+            }
+            else
+            {
+                tempplain.clear();
+                temp = newtemp;
+            }
+        }
 
-    //     // This should never be called
-    //     assert(0);
-    //     Plaintext fail;
-    //     return fail;
-    // }
+        // This should never be called
+        assert(0);
+        Plaintext fail;
+        return fail;
+    }
 
-    // std::vector<uint8_t> PIRClient::decode_reply(PirReply& reply,
-    //                                              uint64_t offset)
-    // {
-    //     Plaintext result = decode_reply(reply);
-    //     return extract_bytes(result, offset);
-    // }
+    std::vector<uint8_t> PIRClient::decode_reply(PirReply& reply,
+                                                 uint64_t offset)
+    {
+        Plaintext result = decode_reply(reply);
+        return extract_bytes(result, offset);
+    }
 
     // Plaintext PIRClient::decrypt(Ciphertext ct)
     // {

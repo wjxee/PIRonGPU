@@ -54,77 +54,92 @@ namespace heoncpu
         }
     }
 
-    // __host__ void HEDecryptor::decrypt_bfv(Plaintext& plaintext,
-    //                                        Ciphertext& ciphertext,
-    //                                        const cudaStream_t stream)
-    // {
-    //     DeviceVector<Data64> output_memory(n, stream);
+    void HEDecryptor::decrypt_bfv(Plaintext& plaintext,
+                                  Ciphertext& ciphertext)
+    {
+        std::vector<Data64> output_memory(n);
 
-    //     Data64* ct0 = ciphertext.data();
-    //     Data64* ct1 = ciphertext.data() + (Q_size_ << n_power);
+        Data64* ct0 = ciphertext.data();
+        Data64* ct1 = ciphertext.data() + (Q_size_ << n_power);
 
-    //     DeviceVector<Data64> temp_memory(2 * n * Q_size_, stream);
-    //     Data64* ct0_temp = temp_memory.data();
-    //     Data64* ct1_temp = temp_memory.data() + (Q_size_ << n_power);
+        std::vector<Data64> temp_memory(2 * n * Q_size_ );
+        Data64* ct0_temp = temp_memory.data();
+        Data64* ct1_temp = temp_memory.data() + (Q_size_ << n_power);
 
-    //     ntt_rns_configuration<Data64> cfg_ntt = {
-    //         .n_power = n_power,
-    //         .ntt_type = FORWARD,
-    //         .reduction_poly = ReductionPolynomial::X_N_plus,
-    //         .zero_padding = false,
-    //         .stream = stream};
-    //     if (!ciphertext.in_ntt_domain_)
-    //     {
-    //         GPU_NTT(ct1, ct1_temp, ntt_table_->data(), modulus_->data(),
-    //                 cfg_ntt, Q_size_, Q_size_);
+        ntt_rns_configuration<Data64> cfg_ntt = {
+            .n_power = n_power,
+            .ntt_type = FORWARD,
+            .reduction_poly = ReductionPolynomial::X_N_plus,
+            .zero_padding = false };
+        if (!ciphertext.in_ntt_domain_)
+        {
+            GPU_NTT(ct1, ct1_temp, ntt_table_->data(), modulus_->data(),
+                    cfg_ntt, Q_size_, Q_size_);
 
-    //         sk_multiplication<<<dim3((n >> 8), Q_size_, 1), 256, 0, stream>>>(
-    //             ct1_temp, secret_key_.data(), ct1_temp, modulus_->data(),
-    //             n_power, Q_size_);
-    //         HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //     }
-    //     else
-    //     {
-    //         sk_multiplication<<<dim3((n >> 8), Q_size_, 1), 256, 0, stream>>>(
-    //             ct1, secret_key_.data(), ct1_temp, modulus_->data(), n_power,
-    //             Q_size_);
-    //         HEONGPU_CUDA_CHECK(cudaGetLastError());
-    //     }
+            // sk_multiplication<<<dim3((n >> 8), Q_size_, 1), 256, 0, stream>>>(
+            //     ct1_temp, secret_key_.data(), ct1_temp, modulus_->data(),
+            //     n_power, Q_size_);
+            // HEONGPU_CUDA_CHECK(cudaGetLastError());
+            sk_multiplication_cpu(
+                ct1_temp, secret_key_.data(), ct1_temp,
+                modulus_->data(), n_power, Q_size_,
+                n >> 8, Q_size_, 1, 256
+            );
+        }
+        else
+        {
+            // sk_multiplication<<<dim3((n >> 8), Q_size_, 1), 256, 0, stream>>>(
+            //     ct1, secret_key_.data(), ct1_temp, modulus_->data(), n_power,
+            //     Q_size_);
+            // HEONGPU_CUDA_CHECK(cudaGetLastError());
+            sk_multiplication_cpu(
+                ct1_temp, secret_key_.data(), ct1_temp,
+                modulus_->data(), n_power, Q_size_,
+                n >> 8, Q_size_, 1, 256
+            );
+        }
 
-    //     ntt_rns_configuration<Data64> cfg_intt = {
-    //         .n_power = n_power,
-    //         .ntt_type = INVERSE,
-    //         .reduction_poly = ReductionPolynomial::X_N_plus,
-    //         .zero_padding = false,
-    //         .mod_inverse = n_inverse_->data(),
-    //         .stream = stream};
+        ntt_rns_configuration<Data64> cfg_intt = {
+            .n_power = n_power,
+            .ntt_type = INVERSE,
+            .reduction_poly = ReductionPolynomial::X_N_plus,
+            .zero_padding = false,
+            .mod_inverse = n_inverse_->data() };
 
-    //     if (ciphertext.in_ntt_domain_)
-    //     {
-    //         // TODO: merge these NTTs
-    //         GPU_NTT(ct0, ct0_temp, intt_table_->data(), modulus_->data(),
-    //                 cfg_intt, Q_size_, Q_size_);
+        if (ciphertext.in_ntt_domain_)
+        {
+            // TODO: merge these NTTs
+            GPU_NTT(ct0, ct0_temp, intt_table_->data(), modulus_->data(),
+                    cfg_intt, Q_size_, Q_size_);
 
-    //         GPU_NTT_Inplace(ct1_temp, intt_table_->data(), modulus_->data(),
-    //                         cfg_intt, Q_size_, Q_size_);
+            GPU_NTT_Inplace(ct1_temp, intt_table_->data(), modulus_->data(),
+                            cfg_intt, Q_size_, Q_size_);
 
-    //         ct0 = ct0_temp;
-    //     }
-    //     else
-    //     {
-    //         GPU_NTT_Inplace(ct1_temp, intt_table_->data(), modulus_->data(),
-    //                         cfg_intt, Q_size_, Q_size_);
-    //     }
+            ct0 = ct0_temp;
+        }
+        else
+        {
+            GPU_NTT_Inplace(ct1_temp, intt_table_->data(), modulus_->data(),
+                            cfg_intt, Q_size_, Q_size_);
+        }
 
-    //     decryption_kernel<<<dim3((n >> 8), 1, 1), 256, 0, stream>>>(
-    //         ct0, ct1_temp, output_memory.data(), modulus_->data(),
-    //         plain_modulus_, gamma_, Qi_t_->data(), Qi_gamma_->data(),
-    //         Qi_inverse_->data(), mulq_inv_t_, mulq_inv_gamma_, inv_gamma_,
-    //         n_power, Q_size_);
-    //     HEONGPU_CUDA_CHECK(cudaGetLastError());
+        // decryption_kernel<<<dim3((n >> 8), 1, 1), 256, 0, stream>>>(
+        //     ct0, ct1_temp, output_memory.data(), modulus_->data(),
+        //     plain_modulus_, gamma_, Qi_t_->data(), Qi_gamma_->data(),
+        //     Qi_inverse_->data(), mulq_inv_t_, mulq_inv_gamma_, inv_gamma_,
+        //     n_power, Q_size_);
+        // HEONGPU_CUDA_CHECK(cudaGetLastError());
+        decryption_kernel_cpu(
+            ct0 , ct1_temp, output_memory.data(),
+            modulus_->data(), plain_modulus_, gamma_,
+            Qi_t_->data(), Qi_gamma_->data(), Qi_inverse_->data(),
+            mulq_inv_t_, mulq_inv_gamma_, inv_gamma_,
+            n_power, Q_size_,
+            (n >> 8), 1, 1, 256
+        );
 
-    //     plaintext.memory_set(std::move(output_memory));
-    // }
+        plaintext.memory_set(std::move(output_memory));
+    }
 
     // __host__ void HEDecryptor::decryptx3_bfv(Plaintext& plaintext,
     //                                          Ciphertext& ciphertext,

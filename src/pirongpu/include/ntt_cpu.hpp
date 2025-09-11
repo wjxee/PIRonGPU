@@ -194,13 +194,15 @@ namespace heoncpu
     //     int N_power, Ninverse<typename std::make_unsigned<T>::type>* n_inverse,
     //     bool last_kernel, bool reduction_poly_check, int mod_count);
     template <typename T>
-    void InverseCoreCPU(T* polynomial_in, T* polynomial_out,
-                        const Root<T>* inverse_root_of_unity_table,
-                        Modulus<T>* modulus, int shared_index, int logm, int k,
-                        int outer_iteration_count, int N_power, Ninverse<T>* n_inverse,
-                        bool last_kernel, bool reduction_poly_check, int mod_count,
-                        int griddim_x, int griddim_y, int batch_size,
-                        int blockdim_x, int blockdim_y);
+    void InverseCoreCPU(
+        T* polynomial_in, T* polynomial_out,
+        const Root<T>* inverse_root_of_unity_table,
+        Modulus<T>* modulus, int shared_index, int logm, int k,
+        int outer_iteration_count, int N_power, Ninverse<T>* n_inverse,
+        bool last_kernel, bool reduction_poly_check, int mod_count,
+        int grid_x, int grid_y, int grid_z, 
+        int block_size_x, int block_size_y,
+        int shared_memory_size);
     // // It provides multiple NTT operation with using single prime.
     // template <typename T>
     // __global__ void InverseCore_(
@@ -399,14 +401,17 @@ namespace heoncpu
     //  * No transposition is performed — both modes read from the same memory
     //  * layout but interpret it differently depending on the NTT strategy.
     //  */
+    // template <typename T>
+    // void
+    // GPU_NTT(T* device_in, typename std::make_unsigned<T>::type* device_out,
+    //         Root<typename std::make_unsigned<T>::type>* root_of_unity_table,
+    //         Modulus<typename std::make_unsigned<T>::type>* modulus,
+    //         ntt_rns_configuration<typename std::make_unsigned<T>::type> cfg,
+    //         int batch_size, int mod_count);
     template <typename T>
-    void
-    GPU_NTT(T* device_in, typename std::make_unsigned<T>::type* device_out,
-            Root<typename std::make_unsigned<T>::type>* root_of_unity_table,
-            Modulus<typename std::make_unsigned<T>::type>* modulus,
-            ntt_rns_configuration<typename std::make_unsigned<T>::type> cfg,
-            int batch_size, int mod_count);
-
+    void GPU_NTT(T* device_in, T* device_out, Root<T>* root_of_unity_table,
+                        Modulus<T>* modulus, ntt_rns_configuration<T> cfg,
+                        int batch_size, int mod_count);
     // template <typename T>
     // __host__ void
     // GPU_INTT(typename std::make_unsigned<T>::type* device_in, T* device_out,

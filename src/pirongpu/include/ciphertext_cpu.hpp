@@ -313,7 +313,7 @@ namespace heoncpu
             return *this;
         }
 
-      private:
+    //   private:
         scheme_type scheme_;
 
         int ring_size_;

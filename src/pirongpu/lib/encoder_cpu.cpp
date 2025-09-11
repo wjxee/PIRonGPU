@@ -279,36 +279,39 @@ namespace heoncpu
     //     plain.memory_set(std::move(output_memory));
     // }
 
-    // __host__ void HEEncoder::decode_bfv(std::vector<uint64_t>& message,
-    //                                     Plaintext& plain,
-    //                                     const cudaStream_t stream)
-    // {
-    //     DeviceVector<Data64> temp_memory(slot_count_ + n, stream);
-    //     Data64* message_gpu = temp_memory.data();
-    //     Data64* temp_plain = message_gpu + slot_count_;
+    void HEEncoder::decode_bfv(std::vector<uint64_t>& message,
+                                        Plaintext& plain )
+    {
+        std::vector<Data64> temp_memory(slot_count_ + n );
+        Data64* message_gpu = temp_memory.data();
+        Data64* temp_plain = message_gpu + slot_count_;
 
-    //     ntt_rns_configuration<Data64> cfg_ntt = {
-    //         .n_power = n_power,
-    //         .ntt_type = FORWARD,
-    //         .reduction_poly = ReductionPolynomial::X_N_plus,
-    //         .zero_padding = false,
-    //         .stream = stream};
+        ntt_rns_configuration<Data64> cfg_ntt = {
+            .n_power = n_power,
+            .ntt_type = FORWARD,
+            .reduction_poly = ReductionPolynomial::X_N_plus,
+            .zero_padding = false };
 
-    //     GPU_NTT(plain.data(), temp_plain, plain_ntt_tables_->data(),
-    //             plain_modulus_->data(), cfg_ntt, 1, 1);
-    //     HEONGPU_CUDA_CHECK(cudaGetLastError());
+        GPU_NTT(plain.data(), temp_plain, plain_ntt_tables_->data(),
+                plain_modulus_->data(), cfg_ntt, 1, 1);
+        // HEONGPU_CUDA_CHECK(cudaGetLastError());
 
-    //     decode_kernel_bfv<<<dim3((n >> 8), 1, 1), 256, 0, stream>>>(
-    //         message_gpu, temp_plain, encoding_location_->data());
-    //     HEONGPU_CUDA_CHECK(cudaGetLastError());
+        // decode_kernel_bfv<<<dim3((n >> 8), 1, 1), 256, 0, stream>>>(
+        //     message_gpu, temp_plain, encoding_location_->data());
+        // HEONGPU_CUDA_CHECK(cudaGetLastError());
+        decode_kernel_bfv_cpu(
+            message_gpu, temp_plain, encoding_location_->data(),
+            (n >> 8), 1, 1, 256
+        );    
+        message.resize(slot_count_);
 
-    //     message.resize(slot_count_);
-
-    //     cudaMemcpyAsync(message.data(), message_gpu,
-    //                     slot_count_ * sizeof(uint64_t), cudaMemcpyDeviceToHost,
-    //                     stream);
-    //     HEONGPU_CUDA_CHECK(cudaGetLastError());
-    // }
+        // cudaMemcpyAsync(message.data(), message_gpu,
+        //                 slot_count_ * sizeof(uint64_t), cudaMemcpyDeviceToHost,
+        //                 stream);
+        // HEONGPU_CUDA_CHECK(cudaGetLastError());
+        std::memcpy(message.data(), message_gpu,
+                        slot_count_ * sizeof(uint64_t));
+    }
 
     // __host__ void HEEncoder::decode_bfv(std::vector<int64_t>& message,
     //                                     Plaintext& plain,

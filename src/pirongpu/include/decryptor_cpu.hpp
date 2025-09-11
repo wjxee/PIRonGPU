@@ -1,7 +1,7 @@
 #pragma once 
 // #include "common.cuh"
 // #include "cuda_runtime.h"
-// #include "decryption.hpp"
+#include "decryption_cpu.hpp"
 #include "ntt_cpu.hpp"
 #include "context_cpu.hpp"
 #include "random_cpu.hpp"
@@ -50,65 +50,65 @@ namespace heoncpu
          * will be stored.
          * @param ciphertext Ciphertext object to be decrypted.
          */
-    //     __host__ void
-    //     decrypt(Plaintext& plaintext, Ciphertext& ciphertext,
-    //             const ExecutionOptions& options = ExecutionOptions())
-    //     {
-    //         switch (static_cast<int>(scheme_))
-    //         {
-    //             case 1: // BFV
-    //                 input_storage_manager(
-    //                     ciphertext,
-    //                     [&](Ciphertext& ciphertext_)
-    //                     {
-    //                         output_storage_manager(
-    //                             plaintext,
-    //                             [&](Plaintext& plaintext_)
-    //                             {
-    //                                 decrypt_bfv(plaintext_, ciphertext_,
-    //                                             options.stream_);
+        void
+        decrypt(Plaintext& plaintext, Ciphertext& ciphertext)
+        {
+            switch (static_cast<int>(scheme_))
+            {
+                case 1: // BFV
+                    // input_storage_manager(
+                    //     ciphertext,
+                    //     [&](Ciphertext& ciphertext_)
+                    //     {
+                    //         output_storage_manager(
+                    //             plaintext,
+                    //             [&](Plaintext& plaintext_)
+                    //             {
+                    //                 decrypt_bfv(plaintext_, ciphertext_,
+                    //                             options.stream_);
 
-    //                                 plaintext.plain_size_ = n;
-    //                                 plaintext.scheme_ = scheme_;
-    //                                 plaintext.depth_ = 0;
-    //                                 plaintext.scale_ = 0;
-    //                                 plaintext.in_ntt_domain_ = false;
-    //                             },
-    //                             options);
-    //                     },
-    //                     options, false);
-    //                 break;
-    //             case 2: // CKKS
+                    //                 plaintext.plain_size_ = n;
+                    //                 plaintext.scheme_ = scheme_;
+                    //                 plaintext.depth_ = 0;
+                    //                 plaintext.scale_ = 0;
+                    //                 plaintext.in_ntt_domain_ = false;
+                    //             },
+                    //             options);
+                    //     },
+                    //     options, false);
+                    decrypt_bfv(plaintext, ciphertext);
+                    break;
+                case 2: // CKKS
 
-    //                 input_storage_manager(
-    //                     ciphertext,
-    //                     [&](Ciphertext& ciphertext_)
-    //                     {
-    //                         output_storage_manager(
-    //                             plaintext,
-    //                             [&](Plaintext& plaintext_)
-    //                             {
-    //                                 decrypt_ckks(plaintext_, ciphertext,
-    //                                              options.stream_);
+                    // input_storage_manager(
+                    //     ciphertext,
+                    //     [&](Ciphertext& ciphertext_)
+                    //     {
+                    //         output_storage_manager(
+                    //             plaintext,
+                    //             [&](Plaintext& plaintext_)
+                    //             {
+                    //                 decrypt_ckks(plaintext_, ciphertext,
+                    //                              options.stream_);
 
-    //                                 plaintext.plain_size_ = n * Q_size_;
-    //                                 plaintext.scheme_ = scheme_;
-    //                                 plaintext.depth_ = ciphertext.depth_;
-    //                                 plaintext.scale_ = ciphertext.scale_;
-    //                                 plaintext.in_ntt_domain_ = true;
-    //                             },
-    //                             options);
-    //                     },
-    //                     options, false);
-    //                 break;
-    //             case 3: // BGV
+                    //                 plaintext.plain_size_ = n * Q_size_;
+                    //                 plaintext.scheme_ = scheme_;
+                    //                 plaintext.depth_ = ciphertext.depth_;
+                    //                 plaintext.scale_ = ciphertext.scale_;
+                    //                 plaintext.in_ntt_domain_ = true;
+                    //             },
+                    //             options);
+                    //     },
+                    //     options, false);
+                    break;
+                case 3: // BGV
 
-    //                 break;
-    //             default:
-    //                 throw std::invalid_argument("Invalid Scheme Type");
-    //                 break;
-    //         }
-    //     }
+                    break;
+                default:
+                    throw std::invalid_argument("Invalid Scheme Type");
+                    break;
+            }
+        }
 
     //     /**
     //      * @brief Calculates the remainder of the noise budget in a ciphertext.
@@ -334,8 +334,7 @@ namespace heoncpu
     //     HEDecryptor& operator=(HEDecryptor&& assign) = default;
 
     //   private:
-    //     __host__ void decrypt_bfv(Plaintext& plaintext, Ciphertext& ciphertext,
-    //                               const cudaStream_t stream);
+        void decrypt_bfv(Plaintext& plaintext, Ciphertext& ciphertext);
 
     //     __host__ void decryptx3_bfv(Plaintext& plaintext,
     //                                 Ciphertext& ciphertext,

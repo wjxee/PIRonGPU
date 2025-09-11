@@ -177,7 +177,7 @@ int main(int argc, char* argv[])
             cudaMemcpy(gk_gpu.data(), galois_keys.device_location_.at(first_ele).data(), gk_size * sizeof(Data64), cudaMemcpyDeviceToHost);
             for(int i=0;i<gk_size;i++){
                 if(gk_gpu[i]!=second_ele[i]){
-                    std::cout << i << ":" << gk_gpu[i] << "==" <<  second_ele[i] <<";" <<std::endl;
+                    // std::cout << i << ":" << gk_gpu[i] << "==" <<  second_ele[i] <<";" <<std::endl;
                     checkflag+=1;
                 } 
             }
@@ -243,7 +243,7 @@ int main(int argc, char* argv[])
 
         PirQuery inner_query = client.generate_query(inner_index);
         //cpu
-        heoncpu::PirQuery inner_query_cpu = client_cpu.generate_query(inner_index_cpu);
+        // heoncpu::PirQuery inner_query_cpu = client_cpu.generate_query(inner_index_cpu);
         std::cout << "[" << (i + 1) << "/" << query_count
                   << "]: query generated" << std::endl;
 
@@ -255,7 +255,7 @@ int main(int argc, char* argv[])
         ele_index_cpu.push_back(inner_ele_index);
         index_cpu.push_back(inner_index_cpu);
         offset_cpu.push_back(inner_offset_cpu);
-        query_cpu.push_back(inner_query_cpu);
+        // query_cpu.push_back(inner_query_cpu);
     }
 
     std::cout << "Main: Initializing server" << std::endl;
@@ -297,6 +297,45 @@ int main(int argc, char* argv[])
     {
         int threadID = omp_get_thread_num();
         multi_reply[i] = server.generate_reply(query[i], 0, streams[threadID]);
+        
+    }
+    //cpu copy
+    for (auto i = 0ULL; i < query_count; i++)
+    {
+        multi_reply_cpu[i].reserve(multi_reply[i].size());
+        for (uint32_t a = 0; a < multi_reply[i].size(); a++)
+        {
+            multi_reply_cpu[i].emplace_back(*context_cpu);
+            multi_reply_cpu[i][a].ring_size_ = multi_reply[i][a].ring_size_;
+            multi_reply_cpu[i][a].coeff_modulus_count_ = multi_reply[i][a].coeff_modulus_count_;
+            multi_reply_cpu[i][a].cipher_size_ = multi_reply[i][a].cipher_size_;
+            multi_reply_cpu[i][a].depth_ = multi_reply[i][a].depth_;
+            multi_reply_cpu[i][a].scheme_ = heoncpu::scheme_type::bfv;
+            multi_reply_cpu[i][a].in_ntt_domain_ = multi_reply[i][a].in_ntt_domain_; 
+ 
+            multi_reply_cpu[i][a].scale_ = multi_reply[i][a].scale_;
+            multi_reply_cpu[i][a].rescale_required_ = multi_reply[i][a].rescale_required_;
+            multi_reply_cpu[i][a].relinearization_required_ = multi_reply[i][a].relinearization_required_;
+
+            if (multi_reply[i][a].storage_type_ == heongpu::storage_type::DEVICE)
+            {
+                std::cout << "reply in device" << std::endl;
+                // std::vector<Data64> gk_gpu(gk_size);
+                // cudaMemcpy(gk_gpu.data(), galois_keys.device_location_.at(first_ele).data(), gk_size * sizeof(Data64), cudaMemcpyDeviceToHost);
+                multi_reply_cpu[i][a].host_locations_.resize(multi_reply[i][a].device_locations_.size());
+                cudaMemcpyAsync(
+                    multi_reply_cpu[i][a].host_locations_.data(), multi_reply[i][a].device_locations_.data(),
+                    multi_reply[i][a].device_locations_.size() * sizeof(Data64),
+                    cudaMemcpyDeviceToHost ); // TODO: use cudaStreamPerThread 
+            }
+            else
+            {
+                std::cout << "reply in host" << std::endl;
+                // std::memcpy(host_locations_.data(),
+                //             copy.host_locations_.data(),
+                //             copy.host_locations_.size() * sizeof(Data64));
+            }
+        }
     }
 
     for (int j = 0; j < query_count; j++)
@@ -305,8 +344,11 @@ int main(int argc, char* argv[])
                   << std::endl;
         std::vector<uint8_t> elems =
             client.decode_reply(multi_reply[j], offset[j]);
+        std::vector<uint8_t> elems_cpu =
+            client_cpu.decode_reply(multi_reply_cpu[j], offset[j]);
 
         assert(elems.size() == size_per_item);
+        assert(elems_cpu.size() == size_per_item);
 
         bool failed = false;
         // Check that we retrieved the correct element
@@ -324,6 +366,22 @@ int main(int argc, char* argv[])
                 failed = true;
             }
         }
+        //cpu test
+        for (uint32_t i = 0; i < size_per_item; i++)
+        {
+            if (elems_cpu[i] != db_copy.get()[(ele_index[j] * size_per_item) + i])
+            {
+                std::cout
+                    << "[" << (j + 1) << "/" << query_count << "]: elems_cpu "
+                    << (int) elems_cpu[i] << ", db "
+                    << (int) db_copy.get()[(ele_index[j] * size_per_item) + i]
+                    << std::endl;
+                std::cout << "[" << (j + 1) << "/" << query_count
+                          << "]: PIR_cpu result wrong at " << i << std::endl;
+                failed = true;
+            }
+        }
+
         if (failed)
         {
             throw std::runtime_error("Failed!");

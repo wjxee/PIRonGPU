@@ -315,7 +315,18 @@ namespace heoncpu
     //         host_locations_.shrink_to_fit();
     //     }
     // }
+    void Plaintext::memory_set(std::vector<Data64>&& new_host_vector)
+    {
+        if (host_locations_.size() > 0)
+        {
+            host_locations_.resize(0);
+            host_locations_.shrink_to_fit();
+        }
+        // storage_type_ = storage_type::DEVICE;
+        host_locations_ = std::move(new_host_vector);
 
+    
+    }
     // void Plaintext::copy_to_device(cudaStream_t stream)
     // {
     //     if (storage_type_ == storage_type::DEVICE)

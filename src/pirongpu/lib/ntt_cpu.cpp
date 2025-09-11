@@ -1970,71 +1970,118 @@ namespace heoncpu
 //         }
 //     }
     template <typename T>
-    void InverseCoreCPU(T* polynomial_in, T* polynomial_out,
-                        const Root<T>* inverse_root_of_unity_table,
-                        Modulus<T>* modulus, int shared_index, int logm, int k,
-                        int outer_iteration_count, int N_power, Ninverse<T>* n_inverse,
-                        bool last_kernel, bool reduction_poly_check, int mod_count,
-                        int griddim_x, int griddim_y, int batch_size,
-                        int blockdim_x, int blockdim_y) {
+    void InverseCoreCPU(
+        T* polynomial_in, T* polynomial_out,
+        const Root<T>* inverse_root_of_unity_table,
+        Modulus<T>* modulus, int shared_index, int logm, int k,
+        int outer_iteration_count, int N_power, Ninverse<T>* n_inverse,
+        bool last_kernel, bool reduction_poly_check, int mod_count,
+        int grid_x, int grid_y, int grid_z, 
+        int block_size_x, int block_size_y,
+        int shared_memory_size) {
         
-        // 计算共享内存大小（以T为单位）
-        int shared_memory_size = blockdim_x * blockdim_y * 2 * sizeof(T);
+        // 计算总多项式大小
+        int n = 1 << N_power;
+        int total_polynomials = grid_z * mod_count;
         
-        // 遍历所有网格和块
-        for (int block_z = 0; block_z < batch_size; block_z++) {
-            for (int block_y = 0; block_y < griddim_y; block_y++) {
-                for (int block_x = 0; block_x < griddim_x; block_x++) {
-                    
-                    // 分配共享内存
-                    std::vector<T> shared_memory(shared_memory_size);
-                    
-                    const int mod_index = block_z % mod_count;
-                    
-                    int t_2 = N_power - logm - 1;
-                    location_t offset = 1 << (N_power - k - 1);
-                    int t_ = (shared_index + 1) - outer_iteration_count;
-                    int loops = outer_iteration_count;
-                    location_t m = (location_t) 1 << logm;
-                    
-                    // 处理所有线程
-                    for (int idx_y = 0; idx_y < blockdim_y; idx_y++) {
-                        for (int idx_x = 0; idx_x < blockdim_x; idx_x++) {
+        // 分配共享内存（模拟）
+        int shared_memory_elements = shared_memory_size / sizeof(T);
+        if (shared_memory_elements < 2 * block_size_x * block_size_y) {
+            throw std::invalid_argument("Shared memory size is too small");
+        }
+        
+        std::vector<T> shared_memory(shared_memory_elements);
+        
+        // 遍历所有block和thread
+        for (int block_z = 0; block_z < grid_z; block_z++) {
+            for (int block_y = 0; block_y < grid_y; block_y++) {
+                for (int block_x = 0; block_x < grid_x; block_x++) {
+                    // 处理当前block中的所有线程
+                    for (int thread_y = 0; thread_y < block_size_y; thread_y++) {
+                        for (int thread_x = 0; thread_x < block_size_x; thread_x++) {
+                            // 模拟线程索引
+                            int idx_x = thread_x;
+                            int idx_y = thread_y;
+                            
+                            // 模拟block索引
+                            int block_x_idx = block_x;
+                            int block_y_idx = block_y;
+                            int block_z_idx = block_z;
+                            
+                            // 计算模数索引
+                            int mod_index = block_z_idx % mod_count;
+                            
+                            // 计算各种位置和偏移
+                            int t_2 = N_power - logm - 1;
+                            location_t offset = 1 << (N_power - k - 1);
+                            int t_ = (shared_index + 1) - outer_iteration_count;
+                            int loops = outer_iteration_count;
+                            location_t m = (location_t) 1 << logm;
+                            
+                            // 计算全局地址
                             location_t global_addresss =
                                 idx_x +
-                                (location_t) (idx_y * (offset / (1 << (outer_iteration_count - 1)))) +
-                                (location_t) (blockdim_x * block_x) +
-                                (location_t) (2 * block_y * offset) + (location_t) (block_z << N_power);
+                                (location_t)(idx_y * (offset / (1 << (outer_iteration_count - 1)))) +
+                                (location_t)(block_size_x * block_x_idx) +
+                                (location_t)(2 * block_y_idx * offset) + 
+                                (location_t)(block_z_idx << N_power);
                             
+                            // 检查全局地址是否越界
+                            if (global_addresss >= n * total_polynomials) {
+                                throw std::out_of_range("Global address out of range: " + std::to_string(global_addresss));
+                            }
+                            
+                            // 计算omega地址
                             location_t omega_addresss =
                                 idx_x +
-                                (location_t) (idx_y * (offset / (1 << (outer_iteration_count - 1)))) +
-                                (location_t) (blockdim_x * block_x) + (location_t) (block_y * offset);
+                                (location_t)(idx_y * (offset / (1 << (outer_iteration_count - 1)))) +
+                                (location_t)(block_size_x * block_x_idx) + 
+                                (location_t)(block_y_idx * offset);
                             
-                            location_t shared_addresss = (idx_x + (idx_y * blockdim_x));
+                            // 计算共享内存地址
+                            location_t shared_addresss = (idx_x + (idx_y * block_size_x));
                             
-                            // 从全局内存加载数据到共享内存
+                            // 检查共享内存地址是否越界
+                            if (shared_addresss >= shared_memory_elements || 
+                                shared_addresss + (block_size_x * block_size_y) >= shared_memory_elements) {
+                                throw std::out_of_range("Shared memory address out of range");
+                            }
+                            
+                            // 从全局内存加载到共享内存（模拟）
                             shared_memory[shared_addresss] = polynomial_in[global_addresss];
-                            shared_memory[shared_addresss + (blockdim_x * blockdim_y)] =
+                            shared_memory[shared_addresss + (block_size_x * block_size_y)] =
                                 polynomial_in[global_addresss + offset];
                             
                             int t = 1 << t_;
                             int in_shared_address = ((shared_addresss >> t_) << t_) + shared_addresss;
+                            
+                            // 检查in_shared_address是否越界
+                            if (in_shared_address >= shared_memory_elements || 
+                                in_shared_address + t >= shared_memory_elements) {
+                                throw std::out_of_range("In-shared address out of range");
+                            }
+                            
                             location_t current_root_index;
                             
                             for (int lp = 0; lp < loops; lp++) {
                                 if (reduction_poly_check) { // X_N_minus
                                     current_root_index =
-                                        (omega_addresss >> t_2) + (location_t) (mod_index << N_power);
+                                        (omega_addresss >> t_2) + (location_t)(mod_index << N_power);
                                 } else { // X_N_plus
                                     current_root_index = m + (omega_addresss >> t_2) +
-                                                        (location_t) (mod_index << N_power);
+                                                        (location_t)(mod_index << N_power);
                                 }
                                 
-                                GentlemanSandeUnit(shared_memory[in_shared_address],
-                                                shared_memory[in_shared_address + t],
-                                                inverse_root_of_unity_table[current_root_index],
-                                                modulus[mod_index]);
+                                // 检查根索引是否越界
+                                if (current_root_index >= n * mod_count) {
+                                    throw std::out_of_range("Root index out of range: " + std::to_string(current_root_index));
+                                }
+                                
+                                GentlemanSandeUnit<T>(
+                                    shared_memory[in_shared_address],
+                                    shared_memory[in_shared_address + t],
+                                    inverse_root_of_unity_table[current_root_index],
+                                    modulus[mod_index]);
                                 
                                 t = t << 1;
                                 t_2 += 1;
@@ -2042,20 +2089,27 @@ namespace heoncpu
                                 m >>= 1;
                                 
                                 in_shared_address = ((shared_addresss >> t_) << t_) + shared_addresss;
+                                
+                                // 检查更新后的in_shared_address是否越界
+                                if (in_shared_address >= shared_memory_elements || 
+                                    in_shared_address + t >= shared_memory_elements) {
+                                    throw std::out_of_range("Updated in-shared address out of range");
+                                }
                             }
                             
-                            // 处理最后一步
+                            // 将结果写回全局内存
                             if (last_kernel) {
                                 polynomial_out[global_addresss] =
-                                    OPERATOR<T>::mult(shared_memory[shared_addresss],
-                                            n_inverse[mod_index], modulus[mod_index]);
-                                polynomial_out[global_addresss + offset] = OPERATOR<T>::mult(
-                                    shared_memory[shared_addresss + (blockdim_x * blockdim_y)],
-                                    n_inverse[mod_index], modulus[mod_index]);
+                                    OPERATOR_GPU<T>::mult(shared_memory[shared_addresss],
+                                                        n_inverse[mod_index], modulus[mod_index]);
+                                polynomial_out[global_addresss + offset] = 
+                                    OPERATOR_GPU<T>::mult(
+                                        shared_memory[shared_addresss + (block_size_x * block_size_y)],
+                                        n_inverse[mod_index], modulus[mod_index]);
                             } else {
                                 polynomial_out[global_addresss] = shared_memory[shared_addresss];
                                 polynomial_out[global_addresss + offset] =
-                                    shared_memory[shared_addresss + (blockdim_x * blockdim_y)];
+                                    shared_memory[shared_addresss + (block_size_x * block_size_y)];
                             }
                         }
                     }
@@ -2063,7 +2117,6 @@ namespace heoncpu
             }
         }
     }
-
 
 //     template <typename T>
 //     __global__ void InverseCore_(
@@ -3720,8 +3773,9 @@ namespace heoncpu
                             cfg.n_power,cfg.mod_inverse, current_kernel_params.not_last_kernel, 
                             (cfg.reduction_poly == ReductionPolynomial::X_N_minus), mod_count,
                             current_kernel_params.griddim_x, current_kernel_params.griddim_y, batch_size,
-                            current_kernel_params.blockdim_x, current_kernel_params.blockdim_y
-                        );
+                            current_kernel_params.blockdim_x, current_kernel_params.blockdim_y,
+                            current_kernel_params.shared_memory
+                        ); 
                         device_in_ = device_out;
                     }
                 }
@@ -3742,16 +3796,8 @@ namespace heoncpu
                     //     (cfg.reduction_poly == ReductionPolynomial::X_N_minus),
                     //     mod_count);
                     // THROW_IF_CUDA_ERROR(cudaGetLastError());
-                    InverseCore_CPU(
-                        device_in_, device_out,
-                        root_of_unity_table, modulus,
-                        current_kernel_params.shared_index, current_kernel_params.logm, 
-                        current_kernel_params.k, current_kernel_params.outer_iteration_count, 
-                        cfg.n_power,cfg.mod_inverse, current_kernel_params.not_last_kernel, 
-                        (cfg.reduction_poly == ReductionPolynomial::X_N_minus), mod_count,
-                        current_kernel_params.griddim_x, current_kernel_params.griddim_y, batch_size,
-                        current_kernel_params.blockdim_x, current_kernel_params.blockdim_y
-                    );
+                    
+                    //invercpucore
                     device_in_ = device_out;
                     for (int i = 1; i < kernel_parameters[cfg.n_power].size(); i++)
                     {
@@ -3772,16 +3818,7 @@ namespace heoncpu
                         //     (cfg.reduction_poly == ReductionPolynomial::X_N_minus),
                         //     mod_count);
                         // THROW_IF_CUDA_ERROR(cudaGetLastError());
-                        InverseCoreCPU(
-                            device_in_, device_out,
-                            root_of_unity_table, modulus,
-                            current_kernel_params.shared_index, current_kernel_params.logm, 
-                            current_kernel_params.k, current_kernel_params.outer_iteration_count, 
-                            cfg.n_power,cfg.mod_inverse, current_kernel_params.not_last_kernel, 
-                            (cfg.reduction_poly == ReductionPolynomial::X_N_minus), mod_count,
-                            current_kernel_params.griddim_x, current_kernel_params.griddim_y, batch_size,
-                            current_kernel_params.blockdim_x, current_kernel_params.blockdim_y
-                        );
+                        //inversecorecpu
                     }
                 }
                 break;
