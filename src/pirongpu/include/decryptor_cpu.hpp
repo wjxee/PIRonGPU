@@ -364,7 +364,7 @@ namespace heoncpu
     //                                       Plaintext& plaintext,
     //                                       const cudaStream_t stream);
 
-      private:
+    //   private:
         scheme_type scheme_;
         int seed_;
         int offset_; // Absolute offset into sequence (curand)

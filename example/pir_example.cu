@@ -340,6 +340,129 @@ int main(int argc, char* argv[])
                 //             copy.host_locations_.size() * sizeof(Data64));
             }
         }
+        //copy client
+        client_cpu.context_->prime_vector.clear();
+        for(int i=0;i<client.context_->prime_vector.size();i++){
+            client_cpu.context_->prime_vector.emplace_back(client.context_->prime_vector[i]);
+        }
+        client_cpu.context_->plain_modulus_.value=client.context_->plain_modulus_.value;
+        client_cpu.context_->plain_modulus_.bit=client.context_->plain_modulus_.bit;
+        client_cpu.context_->plain_modulus_.mu=client.context_->plain_modulus_.mu;
+        client_cpu.context_->n = client.context_->n;
+        // client_cpu.pir_params_ = client.pir_params_;
+        client_cpu.pir_params_.enable_symmetric = client.pir_params_.enable_symmetric;
+        client_cpu.pir_params_.enable_batching = client.pir_params_.enable_batching;
+        client_cpu.pir_params_.enable_mswitching = client.pir_params_.enable_mswitching;
+        client_cpu.pir_params_.ele_num = client.pir_params_.ele_num;
+        client_cpu.pir_params_.ele_size = client.pir_params_.ele_size;
+        client_cpu.pir_params_.elements_per_plaintext = client.pir_params_.elements_per_plaintext;
+        client_cpu.pir_params_.num_of_plaintexts = client.pir_params_.num_of_plaintexts;
+        client_cpu.pir_params_.d = client.pir_params_.d;
+        client_cpu.pir_params_.expansion_ratio = client.pir_params_.expansion_ratio;
+        client_cpu.pir_params_.nvec = client.pir_params_.nvec;  
+        client_cpu.pir_params_.slot_count = client.pir_params_.slot_count;
+        // client_cpu.decryptor_ = client.decryptor_; 
+        client_cpu.decryptor_->seed_=client.decryptor_->seed_;
+        client_cpu.decryptor_->offset_=client.decryptor_->offset_; 
+        client_cpu.decryptor_->secret_key_.resize(client.decryptor_->secret_key_.size());
+        cudaMemcpyAsync(
+            client_cpu.decryptor_->secret_key_.data(), client.decryptor_->secret_key_.data(),
+            client.decryptor_->secret_key_.size() * sizeof(Data64),
+            cudaMemcpyDeviceToHost );  
+        client_cpu.decryptor_->n=client.decryptor_->n;
+        client_cpu.decryptor_->n_power=client.decryptor_->n_power;
+        client_cpu.decryptor_->Q_size_=client.decryptor_->Q_size_; 
+        client_cpu.decryptor_->modulus_->resize(client.decryptor_->modulus_->size());
+        cudaMemcpyAsync(
+            client_cpu.decryptor_->modulus_->data(), client.decryptor_->modulus_->data(),
+            client.decryptor_->modulus_->size() * sizeof(Data64),
+            cudaMemcpyDeviceToHost );   
+        client_cpu.decryptor_->ntt_table_->resize(client.decryptor_->ntt_table_->size());
+        cudaMemcpyAsync(
+            client_cpu.decryptor_->ntt_table_->data(), client.decryptor_->ntt_table_->data(),
+            client.decryptor_->ntt_table_->size() * sizeof(Data64),
+            cudaMemcpyDeviceToHost );   
+        client_cpu.decryptor_->intt_table_->resize(client.decryptor_->intt_table_->size());
+        cudaMemcpyAsync(
+            client_cpu.decryptor_->intt_table_->data(), client.decryptor_->intt_table_->data(),
+            client.decryptor_->intt_table_->size() * sizeof(Data64),
+            cudaMemcpyDeviceToHost );   
+        client_cpu.decryptor_->n_inverse_->resize(client.decryptor_->n_inverse_->size());
+        cudaMemcpyAsync(
+            client_cpu.decryptor_->n_inverse_->data(), client.decryptor_->n_inverse_->data(),
+            client.decryptor_->n_inverse_->size() * sizeof(Data64),
+            cudaMemcpyDeviceToHost );  
+        client_cpu.decryptor_->plain_modulus_.value=client.decryptor_->plain_modulus_.value;
+        client_cpu.decryptor_->plain_modulus_.bit=client.decryptor_->plain_modulus_.bit;
+        client_cpu.decryptor_->plain_modulus_.mu=client.decryptor_->plain_modulus_.mu;
+        client_cpu.decryptor_->gamma_.value=client.decryptor_->gamma_.value;
+        client_cpu.decryptor_->gamma_.bit=client.decryptor_->gamma_.bit;
+        client_cpu.decryptor_->gamma_.mu=client.decryptor_->gamma_.mu; 
+        client_cpu.decryptor_->Qi_t_->resize(client.decryptor_->Qi_t_->size());
+        cudaMemcpyAsync(
+            client_cpu.decryptor_->Qi_t_->data(), client.decryptor_->Qi_t_->data(),
+            client.decryptor_->Qi_t_->size() * sizeof(Data64),
+            cudaMemcpyDeviceToHost );   
+        client_cpu.decryptor_->Qi_gamma_->resize(client.decryptor_->Qi_gamma_->size());
+        cudaMemcpyAsync(
+            client_cpu.decryptor_->Qi_gamma_->data(), client.decryptor_->Qi_gamma_->data(),
+            client.decryptor_->Qi_gamma_->size() * sizeof(Data64),
+            cudaMemcpyDeviceToHost );   
+        client_cpu.decryptor_->Qi_inverse_->resize(client.decryptor_->Qi_inverse_->size());
+        cudaMemcpyAsync(
+            client_cpu.decryptor_->Qi_inverse_->data(), client.decryptor_->Qi_inverse_->data(),
+            client.decryptor_->Qi_inverse_->size() * sizeof(Data64),
+            cudaMemcpyDeviceToHost );  
+        client_cpu.decryptor_->mulq_inv_t_=client.decryptor_->mulq_inv_t_;
+        client_cpu.decryptor_->mulq_inv_gamma_=client.decryptor_->mulq_inv_gamma_;
+        client_cpu.decryptor_->inv_gamma_=client.decryptor_->inv_gamma_; 
+        client_cpu.decryptor_->Mi_->resize(client.decryptor_->Mi_->size());
+        cudaMemcpyAsync(
+            client_cpu.decryptor_->Mi_->data(), client.decryptor_->Mi_->data(),
+            client.decryptor_->Mi_->size() * sizeof(Data64),
+            cudaMemcpyDeviceToHost );   
+        client_cpu.decryptor_->Mi_inv_->resize(client.decryptor_->Mi_inv_->size());
+        cudaMemcpyAsync(
+            client_cpu.decryptor_->Mi_inv_->data(), client.decryptor_->Mi_inv_->data(),
+            client.decryptor_->Mi_inv_->size() * sizeof(Data64),
+            cudaMemcpyDeviceToHost );   
+        client_cpu.decryptor_->upper_half_threshold_->resize(client.decryptor_->upper_half_threshold_->size());
+        cudaMemcpyAsync(
+            client_cpu.decryptor_->upper_half_threshold_->data(), client.decryptor_->upper_half_threshold_->data(),
+            client.decryptor_->upper_half_threshold_->size() * sizeof(Data64),
+            cudaMemcpyDeviceToHost );   
+        client_cpu.decryptor_->decryption_modulus_->resize(client.decryptor_->decryption_modulus_->size());
+        cudaMemcpyAsync(
+            client_cpu.decryptor_->decryption_modulus_->data(), client.decryptor_->decryption_modulus_->data(),
+            client.decryptor_->decryption_modulus_->size() * sizeof(Data64),
+            cudaMemcpyDeviceToHost );  
+        client_cpu.decryptor_->total_bit_count_=client.decryptor_->total_bit_count_;
+        
+        int n;
+        int n_power;
+        int slot_count_;
+
+        // BFV
+        std::shared_ptr<DeviceVector<Modulus64>> plain_modulus_;
+        std::shared_ptr<DeviceVector<Ninverse64>> n_plain_inverse_;
+        std::shared_ptr<DeviceVector<Root64>> plain_ntt_tables_;
+        std::shared_ptr<DeviceVector<Root64>> plain_intt_tables_;
+        std::shared_ptr<DeviceVector<Data64>> encoding_location_;
+
+  
+
+        int Q_size_;
+        int total_coeff_bit_count_;
+        std::shared_ptr<DeviceVector<Modulus64>> modulus_;
+        std::shared_ptr<DeviceVector<Root64>> ntt_table_;
+        std::shared_ptr<DeviceVector<Root64>> intt_table_;
+        std::shared_ptr<DeviceVector<Ninverse64>> n_inverse_;
+
+        std::shared_ptr<DeviceVector<Data64>> Mi_;
+        std::shared_ptr<DeviceVector<Data64>> Mi_inv_;
+        std::shared_ptr<DeviceVector<Data64>> upper_half_threshold_;
+        std::shared_ptr<DeviceVector<Data64>> decryption_modulus_;
+
     }
 
     for (int j = 0; j < query_count; j++)
