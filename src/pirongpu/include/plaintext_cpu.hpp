@@ -197,6 +197,7 @@ namespace heoncpu
             // }
             // else
             {
+                host_locations_.resize(copy.host_locations_.size());
                 std::memcpy(host_locations_.data(), copy.host_locations_.data(),
                             copy.host_locations_.size() * sizeof(Data64));
             }
@@ -258,7 +259,7 @@ namespace heoncpu
             return *this;
         }
 
-      private:
+    //   private:
         scheme_type scheme_;
 
         int plain_size_;

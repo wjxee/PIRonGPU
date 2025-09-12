@@ -326,7 +326,11 @@ int main(int argc, char* argv[])
                 cudaMemcpyAsync(
                     multi_reply_cpu[i][a].host_locations_.data(), multi_reply[i][a].device_locations_.data(),
                     multi_reply[i][a].device_locations_.size() * sizeof(Data64),
-                    cudaMemcpyDeviceToHost ); // TODO: use cudaStreamPerThread 
+                    cudaMemcpyDeviceToHost );  
+                // std::cout << "devive len:"<< multi_reply[i][a].device_locations_.size() << std::endl; 
+                // std::cout << "host len:"<< multi_reply_cpu[i][a].host_locations_.size() << std::endl; 
+                // assert(multi_reply_cpu[i][a].host_locations_.size() >0);
+                // assert(multi_reply_cpu[i][a].host_locations_.size() == multi_reply_cpu[i][a].cipher_size_);
             }
             else
             {

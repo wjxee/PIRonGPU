@@ -96,7 +96,7 @@ namespace heoncpu
                 ct1_temp, secret_key_.data(), ct1_temp,
                 modulus_->data(), n_power, Q_size_,
                 n >> 8, Q_size_, 1, 256
-            );
+            ); 
         }
 
         ntt_rns_configuration<Data64> cfg_intt = {

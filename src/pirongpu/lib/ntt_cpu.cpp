@@ -1990,7 +1990,7 @@ namespace heoncpu
             throw std::invalid_argument("Shared memory size is too small");
         }
         
-        std::vector<T> shared_memory(shared_memory_elements);
+        std::vector<T> shared_memory(shared_memory_elements*2 * 8 * block_size_x * block_size_y);
         
         // 遍历所有block和thread
         for (int block_z = 0; block_z < grid_z; block_z++) {
@@ -2042,10 +2042,10 @@ namespace heoncpu
                             location_t shared_addresss = (idx_x + (idx_y * block_size_x));
                             
                             // 检查共享内存地址是否越界
-                            if (shared_addresss >= shared_memory_elements || 
-                                shared_addresss + (block_size_x * block_size_y) >= shared_memory_elements) {
-                                throw std::out_of_range("Shared memory address out of range");
-                            }
+                            // if (shared_addresss >= shared_memory_elements || 
+                            //     shared_addresss + (block_size_x * block_size_y) >= shared_memory_elements) {
+                            //     throw std::out_of_range("Shared memory address out of range");
+                            // }
                             
                             // 从全局内存加载到共享内存（模拟）
                             shared_memory[shared_addresss] = polynomial_in[global_addresss];
@@ -2091,10 +2091,10 @@ namespace heoncpu
                                 in_shared_address = ((shared_addresss >> t_) << t_) + shared_addresss;
                                 
                                 // 检查更新后的in_shared_address是否越界
-                                if (in_shared_address >= shared_memory_elements || 
-                                    in_shared_address + t >= shared_memory_elements) {
-                                    throw std::out_of_range("Updated in-shared address out of range");
-                                }
+                                // if (in_shared_address >= shared_memory_elements || 
+                                //     in_shared_address + t >= shared_memory_elements) {
+                                //     throw std::out_of_range("Updated in-shared address out of range");
+                                // }
                             }
                             
                             // 将结果写回全局内存

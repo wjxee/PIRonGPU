@@ -7,7 +7,7 @@
 #include <functional>
 #include <unordered_map>
  
-typedef std::uint32_t location_t;
+typedef unsigned location_t;
 /*
 #if MAX_LOG2_RINGSIZE <= 32
 typedef std::uint32_t location_t;

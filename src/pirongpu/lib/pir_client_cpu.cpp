@@ -166,6 +166,7 @@ namespace heoncpu
         std::cout << "exp_ratio: " << exp_ratio << std::endl;
 
         std::vector<Ciphertext> temp = reply;
+        // std::cout << "temp[2].host_locations_.size(): " << temp[2].host_locations_.size() << std::endl;
         uint32_t ciphertext_size = 2;
         std::cout << "ciphertext_size: " << ciphertext_size << std::endl;
 
@@ -179,8 +180,13 @@ namespace heoncpu
             for (uint32_t j = 0; j < temp.size(); j++)
             {
                 Plaintext ptxt(*context_);
+                // std::cout << "ptxt.host_locations_.size()=" << ptxt.host_locations_.size();
+                // std::cout << ";temp[j].host_locations_.size()="<<temp[j].host_locations_.size()<<std::endl;
+                
                 decryptor_->decrypt(ptxt, temp[j]);
                 tempplain.push_back(ptxt);
+                // std::cout << "ptxt.host_locations_.size()=" << ptxt.host_locations_.size();
+                // std::cout << ";temp[j].host_locations_.size()="<<temp[j].host_locations_.size()<<std::endl;
 
                 if ((j + 1) % (exp_ratio * ciphertext_size) == 0 && j > 0)
                 {
