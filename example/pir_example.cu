@@ -343,7 +343,7 @@ int main(int argc, char* argv[])
         //copy client
         client_cpu.context_->prime_vector.clear();
         for(int i=0;i<client.context_->prime_vector.size();i++){
-            client_cpu.context_->prime_vector.emplace_back(client.context_->prime_vector[i]);
+            client_cpu.context_->prime_vector.push_back(heoncpu::Modulus64(client.context_->prime_vector[i].value));
         }
         client_cpu.context_->plain_modulus_.value=client.context_->plain_modulus_.value;
         client_cpu.context_->plain_modulus_.bit=client.context_->plain_modulus_.bit;
@@ -438,31 +438,78 @@ int main(int argc, char* argv[])
             cudaMemcpyDeviceToHost );  
         client_cpu.decryptor_->total_bit_count_=client.decryptor_->total_bit_count_;
         
-        int n;
-        int n_power;
-        int slot_count_;
+        client_cpu.encoder_->n = client.encoder_->n;
+        client_cpu.encoder_->n_power = client.encoder_->n_power;
+        client_cpu.encoder_->slot_count_ = client.encoder_->slot_count_;
+        client_cpu.encoder_->plain_modulus_->resize(client.encoder_->plain_modulus_->size());
+        cudaMemcpyAsync(
+            client_cpu.encoder_->plain_modulus_->data(), client.encoder_->plain_modulus_->data(),
+            client.encoder_->plain_modulus_->size() * sizeof(Data64),
+            cudaMemcpyDeviceToHost );     
+        client_cpu.encoder_->n_plain_inverse_->resize(client.encoder_->n_plain_inverse_->size());
+        cudaMemcpyAsync(
+            client_cpu.encoder_->n_plain_inverse_->data(), client.encoder_->n_plain_inverse_->data(),
+            client.encoder_->n_plain_inverse_->size() * sizeof(Data64),
+            cudaMemcpyDeviceToHost ); 
+        client_cpu.encoder_->plain_ntt_tables_->resize(client.encoder_->plain_ntt_tables_->size());
+        cudaMemcpyAsync(
+            client_cpu.encoder_->plain_ntt_tables_->data(), client.encoder_->plain_ntt_tables_->data(),
+            client.encoder_->plain_ntt_tables_->size() * sizeof(Data64),
+            cudaMemcpyDeviceToHost ); 
+        client_cpu.encoder_->plain_intt_tables_->resize(client.encoder_->plain_intt_tables_->size());
+        cudaMemcpyAsync(
+            client_cpu.encoder_->plain_intt_tables_->data(), client.encoder_->plain_intt_tables_->data(),
+            client.encoder_->plain_intt_tables_->size() * sizeof(Data64),
+            cudaMemcpyDeviceToHost ); 
+        client_cpu.encoder_->encoding_location_->resize(client.encoder_->encoding_location_->size());
+        cudaMemcpyAsync(
+            client_cpu.encoder_->encoding_location_->data(), client.encoder_->encoding_location_->data(),
+            client.encoder_->encoding_location_->size() * sizeof(Data64),
+            cudaMemcpyDeviceToHost ); 
+        client_cpu.encoder_->Q_size_ = client.encoder_->Q_size_;
+        client_cpu.encoder_->total_coeff_bit_count_=client.encoder_->total_coeff_bit_count_;
+        // client_cpu.encoder_->modulus_->resize(client.encoder_->modulus_->size());
+        // cudaMemcpyAsync(
+        //     client_cpu.encoder_->modulus_->data(), client.encoder_->modulus_->data(),
+        //     client.encoder_->modulus_->size() * sizeof(Modulus64),
+        //     cudaMemcpyDeviceToHost );  
 
-        // BFV
-        std::shared_ptr<DeviceVector<Modulus64>> plain_modulus_;
-        std::shared_ptr<DeviceVector<Ninverse64>> n_plain_inverse_;
-        std::shared_ptr<DeviceVector<Root64>> plain_ntt_tables_;
-        std::shared_ptr<DeviceVector<Root64>> plain_intt_tables_;
-        std::shared_ptr<DeviceVector<Data64>> encoding_location_;
-
-  
-
-        int Q_size_;
-        int total_coeff_bit_count_;
-        std::shared_ptr<DeviceVector<Modulus64>> modulus_;
-        std::shared_ptr<DeviceVector<Root64>> ntt_table_;
-        std::shared_ptr<DeviceVector<Root64>> intt_table_;
-        std::shared_ptr<DeviceVector<Ninverse64>> n_inverse_;
-
-        std::shared_ptr<DeviceVector<Data64>> Mi_;
-        std::shared_ptr<DeviceVector<Data64>> Mi_inv_;
-        std::shared_ptr<DeviceVector<Data64>> upper_half_threshold_;
-        std::shared_ptr<DeviceVector<Data64>> decryption_modulus_;
-
+        // client_cpu.encoder_->ntt_table_->resize(client.encoder_->ntt_table_->size());
+        // cudaMemcpyAsync(
+        //     client_cpu.encoder_->ntt_table_->data(), client.encoder_->ntt_table_->data(),
+        //     client.encoder_->ntt_table_->size() * sizeof(Data64),
+        //     cudaMemcpyDeviceToHost );   
+        // client_cpu.encoder_->intt_table_->resize(client.encoder_->intt_table_->size());
+        // cudaMemcpyAsync(
+        //     client_cpu.encoder_->intt_table_->data(), client.encoder_->intt_table_->data(),
+        //     client.encoder_->intt_table_->size() * sizeof(Data64),
+        //     cudaMemcpyDeviceToHost );   
+        // client_cpu.encoder_->n_inverse_->resize(client.encoder_->n_inverse_->size());
+        // cudaMemcpyAsync(
+        //     client_cpu.encoder_->n_inverse_->data(), client.encoder_->n_inverse_->data(),
+        //     client.encoder_->n_inverse_->size() * sizeof(Data64),
+        //     cudaMemcpyDeviceToHost );    
+        // client_cpu.encoder_->Mi_->resize(client.encoder_->Mi_->size());
+        // cudaMemcpyAsync(
+        //     client_cpu.encoder_->Mi_->data(), client.encoder_->Mi_->data(),
+        //     client.encoder_->Mi_->size() * sizeof(Data64),
+        //     cudaMemcpyDeviceToHost );   
+        // client_cpu.encoder_->Mi_inv_->resize(client.encoder_->Mi_inv_->size());
+        // cudaMemcpyAsync(
+        //     client_cpu.encoder_->Mi_inv_->data(), client.encoder_->Mi_inv_->data(),
+        //     client.encoder_->Mi_inv_->size() * sizeof(Data64),
+        //     cudaMemcpyDeviceToHost );  
+        // client_cpu.encoder_->upper_half_threshold_->resize(client.encoder_->upper_half_threshold_->size());
+        // cudaMemcpyAsync(
+        //     client_cpu.encoder_->upper_half_threshold_->data(), client.encoder_->upper_half_threshold_->data(),
+        //     client.encoder_->upper_half_threshold_->size() * sizeof(Data64),
+        //     cudaMemcpyDeviceToHost ); 
+        // client_cpu.encoder_->decryption_modulus_->resize(client.encoder_->decryption_modulus_->size());
+        // cudaMemcpyAsync(
+        //     client_cpu.encoder_->decryption_modulus_->data(), client.encoder_->decryption_modulus_->data(),
+        //     client.encoder_->decryption_modulus_->size() * sizeof(Data64),
+        //     cudaMemcpyDeviceToHost ); 
+        
     }
 
     for (int j = 0; j < query_count; j++)

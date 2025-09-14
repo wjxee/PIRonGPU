@@ -943,7 +943,7 @@ namespace heoncpu
         //////////////////////////////
         //////////////////////////////
 
-      private:
+    //   private:
         scheme_type scheme_;
 
         int n;
