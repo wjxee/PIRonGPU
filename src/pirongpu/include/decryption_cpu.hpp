@@ -15,7 +15,6 @@ namespace heoncpu{
         Data64* Qi_gamma, Data64* Qi_inverse,
         Data64 mulq_inv_t, Data64 mulq_inv_gamma,
         Data64 inv_gamma, int n_power,
-        int decomp_mod_count,
-        int grid_x, int grid_y, int grid_z, int block_size);    
+        int decomp_mod_count, int n);    
 
 }

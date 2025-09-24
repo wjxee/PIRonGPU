@@ -265,25 +265,17 @@ namespace modular_operation_gpu
 
             //     return result;
             // }
-            uint128_t operator-(const uint128_t other) const {
+            uint128_t operator-(uint128_t& other) const {
                 uint128_t result;
                 
                 // 先计算低64位的差
-                result.value.x = value.x - other.value.x;
+                result.value.x = this->value.x - other.value.x;
                 
                 // 检查低64位是否发生借位
-                bool borrow = value.x < other.value.x;
+                bool borrow = this->value.x < result.value.x;
                 
                 // 计算高64位的差，并考虑借位
-                result.value.y = value.y - other.value.y;
-                if (borrow) {
-                    // 如果高64位已经是0，再借位会导致下溢
-                    if (result.value.y == 0) {
-                        // 这里可以根据需求抛出异常或返回最大值
-                        throw std::underflow_error("128-bit subtraction underflow");
-                    }
-                    result.value.y -= 1; // 处理借位
-                }
+                result.value.y = this->value.y - other.value.y - (borrow?1:0);
                 
                 return result;
             }
@@ -345,36 +337,43 @@ namespace modular_operation_gpu
         //         : "l"(a), "l"(b));
         //     return result;
         // }
-        static uint128_t mult128(Data64 a, Data64 b) {
-            // 将64位数分解为32位部分
-            Data64 a_low = a & 0xFFFFFFFF;
-            Data64 a_high = a >> 32;
-            Data64 b_low = b & 0xFFFFFFFF;
-            Data64 b_high = b >> 32;
+        static uint128_t mult128(const Data64& a, const Data64& b)
+        {
+            uint128_t result;
             
-            // 计算部分乘积
-            Data64 p0 = a_low * b_low;
-            Data64 p1 = a_low * b_high;
-            Data64 p2 = a_high * b_low;
-            Data64 p3 = a_high * b_high;
+            // 将64位数拆分为高32位和低32位
+            uint32_t a_high = a >> 32;
+            uint32_t a_low = a & 0xFFFFFFFF;
+            uint32_t b_high = b >> 32;
+            uint32_t b_low = b & 0xFFFFFFFF;
             
-            // 累加部分乘积，考虑进位
-            Data64 low = p0;
-            Data64 high = p3;
+            // 计算四个32位乘积
+            uint64_t p_low_low = (uint64_t)a_low * b_low;           // 低×低
+            uint64_t p_low_high = (uint64_t)a_low * b_high;         // 低×高
+            uint64_t p_high_low = (uint64_t)a_high * b_low;         // 高×低
+            uint64_t p_high_high = (uint64_t)a_high * b_high;       // 高×高
             
-            // 将p1和p2相加
-            Data64 mid = p1 + p2;
-            Data64 carry = (mid < p1) ? 1 : 0; // 检查加法是否溢出
+            // 组合结果（128位 = 4个32位部分）
+            uint64_t low_part = p_low_low;                          // 最低32位部分
+            uint64_t mid_part1 = p_low_high;                        // 中间部分1
+            uint64_t mid_part2 = p_high_low;                        // 中间部分2
+            uint64_t high_part = p_high_high;                       // 最高32位部分
             
-            // 将中间结果加到低位
-            Data64 prev_low = low;
-            low += (mid << 32);
-            if (low < prev_low) carry++; // 检查加法是否溢出
+            // 将中间部分左移32位（对应它们在128位结果中的位置）
+            uint64_t mid_combined = mid_part1 + mid_part2;
+            uint64_t mid_shifted_low = mid_combined << 32;          // 中间部分的低32位影响
+            uint64_t mid_shifted_high = mid_combined >> 32;         // 中间部分的高32位影响
             
-            // 将中间结果的高位和进位加到高位
-            high += (mid >> 32) + (carry << 32);
+            // 计算最终的低64位和高64位
+            result.value.x = low_part + mid_shifted_low;            // 低64位
+            result.value.y = high_part + mid_shifted_high;          // 高64位
             
-            return uint128_t(low, high);
+            // 处理低64位加法可能产生的进位
+            if (result.value.x < low_part) {  // 检查是否溢出
+                result.value.y += 1;          // 向高64位进位
+            }
+            
+            return result;
         }
         // Modular Multiplication
         // result = (input1 * input2) % modulus
@@ -437,6 +436,38 @@ namespace modular_operation_gpu
             }
         }
 
+        // Forced Reduction
+        // result = input1 % modulus
+        static T1 forced_reduce(T1 input1,  const Modulus<T1>& modulus)
+        {
+            if constexpr (std::is_same<T1, Data32>::value)
+            {
+                Data64 z = (static_cast<Data64>(input1[1]) << 32) |
+                           static_cast<Data32>(input1[0]);
+                Data64 w = z >> (modulus.bit - 2);
+                w = mult64(static_cast<Data32>(w), modulus.mu);
+                w = w >> (modulus.bit + 3);
+                w = mult64(static_cast<Data32>(w), modulus.value);
+                z = z - w;
+                return static_cast<T1>(
+                    (z >= modulus.value) ? (z - modulus.value) : z);
+            }
+            else
+            {
+                uint128_t z;
+                z.value.x = input1;
+                z.value.y = 0;
+                uint128_t w = z >> (modulus.bit - 2);
+                w = mult128(w.value.x, modulus.mu);
+                w = w >> (modulus.bit + 3);
+                w = mult128(w.value.x, modulus.value);
+                z = z - w;
+                return (z.value.x >= modulus.value)
+                           ? (z.value.x - modulus.value)
+                           : z.value.x;
+            }
+        }
+
         // Forced Reduction (Repeated Reduction Until Input < Modulus)
         // result = input1 % modulus
         static T1
@@ -445,7 +476,7 @@ namespace modular_operation_gpu
             T1 result = input;
             while (result >= modulus.value)
             {
-                result = reduce(result, modulus);
+                result = forced_reduce(result, modulus);
             }
             return result;
         }

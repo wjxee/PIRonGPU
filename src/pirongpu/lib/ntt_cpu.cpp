@@ -3664,7 +3664,7 @@ namespace heoncpu
                                 current_kernel_params.blockdim_x, current_kernel_params.blockdim_y,
                                 current_kernel_params.shared_memory);
                             
-                            std::cout << "ForwardCore completed successfully" << std::endl;
+                            // std::cout << "ForwardCore completed successfully" << std::endl;
                         } catch (const std::exception& e) {
                             std::cerr << "Error in ForwardCore: " << e.what() << std::endl; 
                             std::exit(EXIT_FAILURE);
@@ -3706,7 +3706,7 @@ namespace heoncpu
                                 current_kernel_params.blockdim_x, current_kernel_params.blockdim_y,
                                 current_kernel_params.shared_memory);
                             
-                            std::cout << "ForwardCore completed successfully" << std::endl;
+                            // std::cout << "ForwardCore completed successfully" << std::endl;
                         } catch (const std::exception& e) {
                             std::cerr << "Error in ForwardCore: " << e.what() << std::endl; 
                             std::exit(EXIT_FAILURE);

@@ -134,8 +134,7 @@ namespace heoncpu
             modulus_->data(), plain_modulus_, gamma_,
             Qi_t_->data(), Qi_gamma_->data(), Qi_inverse_->data(),
             mulq_inv_t_, mulq_inv_gamma_, inv_gamma_,
-            n_power, Q_size_,
-            (n >> 8), 1, 1, 256
+            n_power, Q_size_,n
         );
 
         plaintext.memory_set(std::move(output_memory));
