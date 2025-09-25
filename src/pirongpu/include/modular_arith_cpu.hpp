@@ -239,6 +239,17 @@ namespace modular_operation_gpu
                 return result;
             }
 
+            // uint128_t
+            // operator>>(const unsigned shift)
+            // {
+            //     uint128_t result;
+
+            //     result.value.x = value.x >> shift;
+            //     result.value.x = (value.y << (64 - shift)) | result.value.x;
+            //     result.value.y = value.y >> shift;
+
+            //     return result;
+            // }
             uint128_t
             operator>>(const unsigned shift)
             {
@@ -337,42 +348,54 @@ namespace modular_operation_gpu
         //         : "l"(a), "l"(b));
         //     return result;
         // }
-        static uint128_t mult128(const Data64& a, const Data64& b)
-        {
+
+        //v2
+        // static uint128_t mult128(const Data64& a, const Data64& b)
+        // {
+        //     uint128_t result;
+            
+        //     // 将64位数拆分为高32位和低32位
+        //     uint32_t a_high = a >> 32;
+        //     uint32_t a_low = a & 0xFFFFFFFF;
+        //     uint32_t b_high = b >> 32;
+        //     uint32_t b_low = b & 0xFFFFFFFF;
+            
+        //     // 计算四个32位乘积
+        //     uint64_t p_low_low = (uint64_t)a_low * b_low;           // 低×低
+        //     uint64_t p_low_high = (uint64_t)a_low * b_high;         // 低×高
+        //     uint64_t p_high_low = (uint64_t)a_high * b_low;         // 高×低
+        //     uint64_t p_high_high = (uint64_t)a_high * b_high;       // 高×高
+            
+        //     // 组合结果（128位 = 4个32位部分）
+        //     uint64_t low_part = p_low_low;                          // 最低32位部分
+        //     uint64_t mid_part1 = p_low_high;                        // 中间部分1
+        //     uint64_t mid_part2 = p_high_low;                        // 中间部分2
+        //     uint64_t high_part = p_high_high;                       // 最高32位部分
+            
+        //     // 将中间部分左移32位（对应它们在128位结果中的位置）
+        //     uint64_t mid_combined = mid_part1 + mid_part2;
+        //     uint64_t mid_shifted_low = mid_combined << 32;          // 中间部分的低32位影响
+        //     uint64_t mid_shifted_high = mid_combined >> 32;         // 中间部分的高32位影响
+            
+        //     // 计算最终的低64位和高64位
+        //     result.value.x = low_part + mid_shifted_low;            // 低64位
+        //     result.value.y = high_part + mid_shifted_high;          // 高64位
+            
+        //     // 处理低64位加法可能产生的进位
+        //     if (result.value.x < low_part) {  // 检查是否溢出
+        //         result.value.y += 1;          // 向高64位进位
+        //     }
+            
+        //     return result;
+        // }
+
+        //v3 乘法是对的
+        static uint128_t mult128(const Data64& a, const Data64& b) {
             uint128_t result;
-            
-            // 将64位数拆分为高32位和低32位
-            uint32_t a_high = a >> 32;
-            uint32_t a_low = a & 0xFFFFFFFF;
-            uint32_t b_high = b >> 32;
-            uint32_t b_low = b & 0xFFFFFFFF;
-            
-            // 计算四个32位乘积
-            uint64_t p_low_low = (uint64_t)a_low * b_low;           // 低×低
-            uint64_t p_low_high = (uint64_t)a_low * b_high;         // 低×高
-            uint64_t p_high_low = (uint64_t)a_high * b_low;         // 高×低
-            uint64_t p_high_high = (uint64_t)a_high * b_high;       // 高×高
-            
-            // 组合结果（128位 = 4个32位部分）
-            uint64_t low_part = p_low_low;                          // 最低32位部分
-            uint64_t mid_part1 = p_low_high;                        // 中间部分1
-            uint64_t mid_part2 = p_high_low;                        // 中间部分2
-            uint64_t high_part = p_high_high;                       // 最高32位部分
-            
-            // 将中间部分左移32位（对应它们在128位结果中的位置）
-            uint64_t mid_combined = mid_part1 + mid_part2;
-            uint64_t mid_shifted_low = mid_combined << 32;          // 中间部分的低32位影响
-            uint64_t mid_shifted_high = mid_combined >> 32;         // 中间部分的高32位影响
-            
-            // 计算最终的低64位和高64位
-            result.value.x = low_part + mid_shifted_low;            // 低64位
-            result.value.y = high_part + mid_shifted_high;          // 高64位
-            
-            // 处理低64位加法可能产生的进位
-            if (result.value.x < low_part) {  // 检查是否溢出
-                result.value.y += 1;          // 向高64位进位
-            }
-            
+            // 使用编译器内置的128位类型辅助计算（GCC支持）
+            __uint128_t temp = (__uint128_t)a * b;
+            result.value.x = (Data64)temp;         // 取低64位
+            result.value.y = (Data64)(temp >> 64); // 取高64位
             return result;
         }
         // Modular Multiplication
@@ -394,15 +417,36 @@ namespace modular_operation_gpu
             }
             else
             {
-                uint128_t z = mult128(input1, input2);
-                uint128_t w = z >> (modulus.bit - 2);
-                w = mult128(w.value.x, modulus.mu);
+                // uint128_t z = mult128(input1, input2);
+                // uint128_t w = z >> (modulus.bit - 2);
+                // w = mult128(w.value.x, modulus.mu);
+                // w = w >> (modulus.bit + 3);
+                // w = mult128(w.value.x, modulus.value);
+                // z = z - w;
+                // return (z.value.x >= modulus.value)
+                //            ? (z.value.x - modulus.value)
+                //            : z.value.x;
+                // 步骤1: 计算z = input1 * input2 (128位)
+                __uint128_t z = (__uint128_t)input1* input2;
+                
+                // 步骤2: w = z >> (modulus.bit - 2)
+                __uint128_t w = z >> (modulus.bit - 2);
+                
+                // 步骤3: w = w的低64位 * modulus.mu (128位)
+                w = (__uint128_t)(uint64_t)w * modulus.mu;
+                
+                // 步骤4: w = w >> (modulus.bit + 3)
                 w = w >> (modulus.bit + 3);
-                w = mult128(w.value.x, modulus.value);
+                
+                // 步骤5: w = w的低64位 * modulus.value (128位)
+                w = (__uint128_t)(uint64_t)w * modulus.value;
+                
+                // 步骤6: z = z - w
                 z = z - w;
-                return (z.value.x >= modulus.value)
-                           ? (z.value.x - modulus.value)
-                           : z.value.x;
+                
+                // 步骤7: 最终结果调整
+                uint64_t z_low = (uint64_t)z;  // 取z的低64位
+                return (z_low >= modulus.value) ? (z_low - modulus.value) : z_low;
             }
         }
 
@@ -454,17 +498,29 @@ namespace modular_operation_gpu
             }
             else
             {
-                uint128_t z;
-                z.value.x = input1;
-                z.value.y = 0;
-                uint128_t w = z >> (modulus.bit - 2);
-                w = mult128(w.value.x, modulus.mu);
+                // uint128_t z;
+                // z.value.x = input1;
+                // z.value.y = 0;
+                // uint128_t w = z >> (modulus.bit - 2);
+                // w = mult128(w.value.x, modulus.mu);
+                // w = w >> (modulus.bit + 3);
+                // w = mult128(w.value.x, modulus.value);
+                // z = z - w;
+                // return (z.value.x >= modulus.value)
+                //            ? (z.value.x - modulus.value)
+                //            : z.value.x;
+                __uint128_t z = (__uint128_t) input1;
+                // z.value.x = input1;
+                // z.value.y = 0;
+                __uint128_t w = z >> (modulus.bit - 2);
+                w = (__uint128_t)(uint64_t)w* modulus.mu;
                 w = w >> (modulus.bit + 3);
-                w = mult128(w.value.x, modulus.value);
+                w = (__uint128_t)(uint64_t)w* modulus.value;
                 z = z - w;
-                return (z.value.x >= modulus.value)
-                           ? (z.value.x - modulus.value)
-                           : z.value.x;
+                uint64_t z_low = (uint64_t)z;
+                return (z_low >= modulus.value)
+                           ? (z_low - modulus.value)
+                           : z_low;                
             }
         }
 

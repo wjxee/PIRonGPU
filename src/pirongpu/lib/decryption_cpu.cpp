@@ -97,14 +97,26 @@ namespace heoncpu{
                 
                 Data64 gamma_ = OPERATOR_GPU_64::reduce_forced(gamma.value, modulus[i]);
 
-                if (idx == 1 && i == 0) {
-                    std::cout << "CPU DEBUG - i=" << i << ": location=" << location 
-                            << ", gamma_=" << gamma_ 
-                            << ", gamma.value=" << gamma.value
-                            << ", modulusvalue=" << modulus[i].value
-                          << std::endl;
-                }
+                // if (idx == 1 && i == 0) {
+                //     std::cout << "CPU DEBUG - i=" << i << ": location=" << location 
+                //             << ", gamma_=" << gamma_ 
+                //             << ", gamma.value=" << gamma.value
+                //             << ", modulusvalue=" << modulus[i].value
+                //           << std::endl;
+                // }
+                // if (idx == 1 && i == 0) {
+                //     std::cout << "CPU DEBUG - i=" << i << ": location=" << location 
+                //             << ", mt_pre=" << mt  
+                //           << std::endl;
+                // }
                 mt = OPERATOR_GPU_64::mult(mt, plain_mod.value, modulus[i]);
+                // if (idx == 1 && i == 0) {
+                //     std::cout << "CPU DEBUG - i=" << i << ": location=" << location 
+                //             << ", mt_result=" << mt 
+                //             << ", plain_mod.value=" << plain_mod.value
+                //             << ", modulusvalue=" << modulus[i].value
+                //           << std::endl;
+                // }
                 mt = OPERATOR_GPU_64::mult(mt, gamma_, modulus[i]);
                 mt = OPERATOR_GPU_64::mult(mt, Qi_inverse[i], modulus[i]);
                 
@@ -112,8 +124,19 @@ namespace heoncpu{
                 Data64 mt_in_gamma = OPERATOR_GPU_64::reduce_forced(mt, gamma);
                 
                 mt_in_t = OPERATOR_GPU_64::mult(mt_in_t, Qi_t[i], plain_mod);
+                // if (idx == 1 && i == 0) {
+                //     std::cout << "CPU DEBUG - i=" << i << ": location=" << location 
+                //             << ", mt_in_gamma_pre=" << mt_in_gamma  
+                //           << std::endl;
+                // }
                 mt_in_gamma = OPERATOR_GPU_64::mult(mt_in_gamma, Qi_gamma[i], gamma);
-                
+                // if (idx == 1 && i == 0) {
+                //     std::cout << "CPU DEBUG - i=" << i << ": location=" << location 
+                //             << ", mt_in_gamma_result=" << mt_in_gamma
+                //             << ", Qi_gamma[i]=" << Qi_gamma[i]
+                //             << ", gamma=" << gamma.value
+                //           << std::endl;
+                // }                
                 sum_t = OPERATOR_GPU_64::add(sum_t, mt_in_t, plain_mod);
                 sum_gamma = OPERATOR_GPU_64::add(sum_gamma, mt_in_gamma, gamma);
             }
